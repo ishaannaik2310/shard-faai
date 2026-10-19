@@ -1,0 +1,16 @@
+# Shard — Adversarial Multi-Agent Insurance Claims Auditor
+# Pinned to versions confirmed in the development environment (Python 3.14.6)
+# Install: pip install -r requirements.txt
+
+streamlit==1.66.0
+pandas==3.0.6
+numpy==2.5.2
+scikit-learn==1.9.0
+plotly==7.1.0
+pytest==9.1.1
+pytest-asyncio==1.4.0
+python-pptx==1.0.2
+pydantic==2.13.4
+pydantic-settings==2.15.0
+python-dateutil==2.9.0.post0
+rich==15.0.0

@@ -1,0 +1,85 @@
+{
+  "version": "1.0.0",
+  "name": "Motor Fraud Baseline Ruleset",
+  "description": "Baseline deterministic rulebook for motor insurance claims triage",
+  "disposition_thresholds": {
+    "approve_below": 25.0,
+    "refer_below": 60.0,
+    "suspected_fraud_at_or_above": 60.0
+  },
+  "rules": [
+    {
+      "rule_id": "RULE_REPAIR_BENCHMARK",
+      "template_id": "TPL_COST_BENCHMARK",
+      "description": "Evaluate claimed repair total against independent benchmark repair cost",
+      "enabled": true,
+      "severity": "HIGH",
+      "score_contribution": 30.0,
+      "parameters": {
+        "max_markup_ratio": 1.35
+      }
+    },
+    {
+      "rule_id": "RULE_LINE_ITEM_ARITHMETIC",
+      "template_id": "TPL_LINE_ITEM_ARITHMETIC",
+      "description": "Verify repair line-item arithmetic consistency and inspect for unrelated operations",
+      "enabled": true,
+      "severity": "MEDIUM",
+      "score_contribution": 20.0,
+      "parameters": {
+        "max_discrepancy_gbp": 1.0,
+        "flag_unrelated_items": true
+      }
+    },
+    {
+      "rule_id": "RULE_VEHICLE_REGISTRATION",
+      "template_id": "TPL_VEHICLE_REGISTRATION",
+      "description": "Verify vehicle registration status with licensing authority",
+      "enabled": true,
+      "severity": "HIGH",
+      "score_contribution": 35.0,
+      "parameters": {
+        "allowed_statuses": ["VALID"]
+      }
+    },
+    {
+      "rule_id": "RULE_WRITE_OFF_STATUS",
+      "template_id": "TPL_WRITE_OFF_STATUS",
+      "description": "Inspect vehicle history for prior non-repairable write-off markers (CAT A / B)",
+      "enabled": true,
+      "severity": "CRITICAL",
+      "score_contribution": 40.0,
+      "parameters": {
+        "disallowed_categories": ["CAT_A", "CAT_B"]
+      }
+    },
+    {
+      "rule_id": "RULE_PRIOR_DAMAGE",
+      "template_id": "TPL_PRIOR_DAMAGE",
+      "description": "Check for self-reported or known prior damage",
+      "enabled": true,
+      "severity": "MEDIUM",
+      "score_contribution": 25.0,
+      "parameters": {}
+    },
+    {
+      "rule_id": "RULE_STAGED_COLLISION_INDICATORS",
+      "template_id": "TPL_STAGED_COLLISION",
+      "description": "Detect anomalous policy inception velocity and linked co-claimant / provider networks",
+      "enabled": true,
+      "severity": "HIGH",
+      "score_contribution": 35.0,
+      "parameters": {
+        "min_policy_age_days": 10,
+        "min_linked_parties": 2
+      }
+    }
+  ],
+  "history": [
+    {
+      "version": "1.0.0",
+      "timestamp": "2026-10-15T00:00:00Z",
+      "rationale": "Initial baseline ruleset release."
+    }
+  ]
+}

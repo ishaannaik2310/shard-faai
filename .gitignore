@@ -1,0 +1,30 @@
+# Python byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.py[cod]
+*$py.class
+
+# Pytest / testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+.env
+*.env
+
+# IDE / Editor configuration
+.idea/
+.vscode/
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Runtime-generated output logs
+data/audit_*.jsonl
+data/demo_audit_*.jsonl

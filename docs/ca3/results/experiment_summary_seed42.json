@@ -1,0 +1,235 @@
+{
+  "metadata": {
+    "system_name": "SHARD: Adversarial Multi-Agent Insurance Claims Auditor",
+    "assignment": "CA-3 Foundations of Agentic AI",
+    "base_seed": 42,
+    "claims_per_round": 30,
+    "total_claims_in_benchmark": 90,
+    "execution_environment": "Python 3.14 (Pure Deterministic, 0 paid APIs, 0 network calls)"
+  },
+  "primary_benchmark_run": {
+    "execution_summary": {
+      "total_rounds_executed": 3,
+      "total_claims_processed": 90,
+      "initial_rulebook_version": "1.0.0",
+      "final_rulebook_version": "1.0.0",
+      "total_proposals": 0,
+      "accepted_proposals": 0,
+      "rejected_proposals": 0,
+      "target_reached": false,
+      "final_stop_reason": "MAX_ROUNDS_REACHED",
+      "initial_metrics_round_1": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "fpr": 0.0
+      },
+      "final_metrics_last_round": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "fpr": 0.0
+      }
+    },
+    "verification_evidence": {
+      "ti_01_vault_isolation_maintained": true,
+      "ti_02_all_claims_have_findings": true,
+      "ti_02_empty_findings_count": 0,
+      "ti_02_total_findings_recorded": 540,
+      "ti_03_real_measured_metrics": true,
+      "ti_05_fp_budget_enforced": true,
+      "ti_07_reproducible_base_seed": 42,
+      "ti_09_audit_trail_path": null
+    },
+    "rounds": [
+      {
+        "round_number": 1,
+        "rulebook_version_before": "1.0.0",
+        "rulebook_version_after": "1.0.0",
+        "claims_count": 30,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "fpr": 0.0,
+        "tp": 9,
+        "fp": 0,
+        "tn": 21,
+        "fn": 0,
+        "per_typology_recall": {
+          "STAGED_COLLISION": 1.0,
+          "EXAGGERATED_REPAIR": 1.0,
+          "PRE_EXISTING_DAMAGE": 1.0,
+          "OPPORTUNISTIC_INFLATION": 1.0
+        },
+        "rule_proposals": [],
+        "continuation_decision": "CONTINUE",
+        "stop_reason": null
+      },
+      {
+        "round_number": 2,
+        "rulebook_version_before": "1.0.0",
+        "rulebook_version_after": "1.0.0",
+        "claims_count": 30,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "fpr": 0.0,
+        "tp": 9,
+        "fp": 0,
+        "tn": 21,
+        "fn": 0,
+        "per_typology_recall": {
+          "PRE_EXISTING_DAMAGE": 1.0,
+          "GHOST_VEHICLE": 1.0,
+          "EXAGGERATED_REPAIR": 1.0,
+          "OPPORTUNISTIC_INFLATION": 1.0
+        },
+        "rule_proposals": [],
+        "continuation_decision": "CONTINUE",
+        "stop_reason": null
+      },
+      {
+        "round_number": 3,
+        "rulebook_version_before": "1.0.0",
+        "rulebook_version_after": "1.0.0",
+        "claims_count": 30,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "fpr": 0.0,
+        "tp": 9,
+        "fp": 0,
+        "tn": 21,
+        "fn": 0,
+        "per_typology_recall": {
+          "GHOST_VEHICLE": 1.0,
+          "STAGED_COLLISION": 1.0,
+          "EXAGGERATED_REPAIR": 1.0,
+          "OPPORTUNISTIC_INFLATION": 1.0
+        },
+        "rule_proposals": [],
+        "continuation_decision": "MAX_ROUNDS_REACHED",
+        "stop_reason": "MAX_ROUNDS_REACHED"
+      }
+    ]
+  },
+  "adaptive_calibration_run": {
+    "execution_summary": {
+      "total_rounds_executed": 3,
+      "total_claims_processed": 90,
+      "initial_rulebook_version": "1.0.0",
+      "final_rulebook_version": "1.1.0",
+      "total_proposals": 1,
+      "accepted_proposals": 1,
+      "rejected_proposals": 0,
+      "target_reached": false,
+      "final_stop_reason": "MAX_ROUNDS_REACHED",
+      "initial_metrics_round_1": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "fpr": 0.0
+      },
+      "final_metrics_last_round": {
+        "precision": 1.0,
+        "recall": 0.8333,
+        "f1_score": 0.9091,
+        "fpr": 0.0
+      }
+    },
+    "verification_evidence": {
+      "ti_01_vault_isolation_maintained": true,
+      "ti_02_all_claims_have_findings": true,
+      "ti_02_empty_findings_count": 0,
+      "ti_02_total_findings_recorded": 540,
+      "ti_03_real_measured_metrics": true,
+      "ti_05_fp_budget_enforced": true,
+      "ti_07_reproducible_base_seed": 42,
+      "ti_09_audit_trail_path": null
+    },
+    "rounds": [
+      {
+        "round_number": 1,
+        "rulebook_version_before": "1.0.0",
+        "rulebook_version_after": "1.0.0",
+        "claims_count": 30,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "fpr": 0.0,
+        "tp": 12,
+        "fp": 0,
+        "tn": 18,
+        "fn": 0,
+        "per_typology_recall": {
+          "STAGED_COLLISION": 1.0,
+          "EXAGGERATED_REPAIR": 1.0,
+          "PRE_EXISTING_DAMAGE": 1.0,
+          "OPPORTUNISTIC_INFLATION": 1.0
+        },
+        "rule_proposals": [],
+        "continuation_decision": "CONTINUE",
+        "stop_reason": null
+      },
+      {
+        "round_number": 2,
+        "rulebook_version_before": "1.0.0",
+        "rulebook_version_after": "1.1.0",
+        "claims_count": 30,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1_score": 0.8571,
+        "fpr": 0.0,
+        "tp": 9,
+        "fp": 0,
+        "tn": 18,
+        "fn": 3,
+        "per_typology_recall": {
+          "PRE_EXISTING_DAMAGE": 1.0,
+          "EXAGGERATED_REPAIR": 1.0,
+          "OPPORTUNISTIC_INFLATION": 0.25,
+          "GHOST_VEHICLE": 1.0
+        },
+        "rule_proposals": [
+          {
+            "rule_id": "RULE_LINE_ITEM_ARITHMETIC",
+            "parameter_name": "max_discrepancy_gbp",
+            "candidate_value": 0.5,
+            "old_value": 1.0,
+            "rationale": "Diagnosed 3 missed OPPORTUNISTIC_INFLATION claims in Round 1. Proposing bounded tighten of RULE_LINE_ITEM_ARITHMETIC.max_discrepancy_gbp from 1.0 to 0.5 (allowed bounds: [0.0, 5.0]).",
+            "status": "ACCEPTED",
+            "gate_failed": null,
+            "rejection_reason": "",
+            "validation_fp_rate": 0.0
+          }
+        ],
+        "continuation_decision": "CONTINUE",
+        "stop_reason": null
+      },
+      {
+        "round_number": 3,
+        "rulebook_version_before": "1.1.0",
+        "rulebook_version_after": "1.1.0",
+        "claims_count": 30,
+        "precision": 1.0,
+        "recall": 0.8333,
+        "f1_score": 0.9091,
+        "fpr": 0.0,
+        "tp": 10,
+        "fp": 0,
+        "tn": 18,
+        "fn": 2,
+        "per_typology_recall": {
+          "EXAGGERATED_REPAIR": 1.0,
+          "STAGED_COLLISION": 1.0,
+          "GHOST_VEHICLE": 1.0,
+          "PRE_EXISTING_DAMAGE": 1.0,
+          "OPPORTUNISTIC_INFLATION": 0.3333
+        },
+        "rule_proposals": [],
+        "continuation_decision": "MAX_ROUNDS_REACHED",
+        "stop_reason": "MAX_ROUNDS_REACHED"
+      }
+    ]
+  }
+}

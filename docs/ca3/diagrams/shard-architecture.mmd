@@ -1,0 +1,114 @@
+flowchart TD
+    %% =========================================================================
+    %% SHARD ARCHITECTURE DIAGRAM
+    %% Adversarial Multi-Agent Insurance Claims Auditor
+    %% CA-3 Foundations of Agentic AI
+    %% =========================================================================
+
+    classDef uiBox fill:#161b22,stroke:#58a6ff,stroke-width:2px,color:#e6edf3;
+    classDef orchBox fill:#1c2128,stroke:#6aa9ff,stroke-width:2px,color:#e6edf3;
+    classDef invBox fill:#1a2332,stroke:#46f9b8,stroke-width:2px,color:#e6edf3;
+    classDef evalBox fill:#2a1c2d,stroke:#ff6b8a,stroke-width:2px,color:#e6edf3;
+    classDef adaptBox fill:#2e2417,stroke:#ffc14d,stroke-width:2px,color:#e6edf3;
+    classDef storeBox fill:#1f1c2d,stroke:#b388ff,stroke-width:2px,color:#e6edf3;
+    classDef toolBox fill:#15222e,stroke:#388bfd,stroke-width:1px,color:#e6edf3;
+    classDef gateBox fill:#381d24,stroke:#f85149,stroke-width:2px,color:#e6edf3;
+
+    %% -------------------------------------------------------------------------
+    %% PRESENTATION & ORCHESTRATION
+    %% -------------------------------------------------------------------------
+    subgraph PRESENTATION_TIER [" Presentation & Human Decision Support "]
+        UI["🖥️ Streamlit Control Room<br/><code>app/streamlit_app.py</code><br/><i>KPIs · Claims Explorer · Traces · Critic Report · Rule Diffs · Audit Export</i>"]:::uiBox
+    end
+
+    subgraph ORCHESTRATION_TIER [" Orchestration & Audit Core "]
+        ORCH["⚙️ Orchestrator<br/><code>shard/orchestrator.py</code><br/><i>Round Lifecycle · State Machine · Convergence & Early Stop Check</i>"]:::orchBox
+        AUDIT["📜 Audit Logger<br/><code>shard/logging/audit.py</code><br/><i>Tamper-Evident JSONL Trail · 100% Decision Traceability</i>"]:::storeBox
+    end
+
+    %% -------------------------------------------------------------------------
+    %% TRUST BOUNDARY 1: DATA GENERATION
+    %% -------------------------------------------------------------------------
+    subgraph DATA_GEN_TIER [" Data Generation Tier (Seeded & Isolated) "]
+        FRAUDSTER["🦹 Fraudster Agent<br/><code>shard/agents/fraudster.py</code><br/><i>Receives Redacted Miss Summary · Shifts Typology Weights</i>"]:::adaptBox
+        GEN["🎲 Synthetic Claim Generator<br/><code>shard/data/generator.py</code><br/><i>Seeded RNG · 5 Motor Typologies · 100% Deterministic</i>"]:::orchBox
+        VAULT[("🔒 Ground-Truth Vault<br/><code>shard/data/vault.py</code><br/><i>STRICT RESTRICTION: GT Labels Accessible ONLY to Critic</i>")]:::storeBox
+    end
+
+    %% -------------------------------------------------------------------------
+    %% TRUST BOUNDARY 2: INVESTIGATION ZONE (NO GT LABELS ACCESSIBLE)
+    %% -------------------------------------------------------------------------
+    subgraph INVESTIGATION_ZONE [" TRUST BOUNDARY: Investigation Zone (Observable Claims Only · No GT Access) "]
+        PLANNER["📋 Planner Agent<br/><code>shard/agents/planner.py</code><br/><i>Inspects Claim Features · Selects & Orders Verification Checks</i>"]:::invBox
+        RESEARCHER["🔍 Research Agent<br/><code>shard/agents/researcher.py</code><br/><i>Policy Registry · Damage History · Provider Network Lookup</i>"]:::invBox
+        
+        subgraph RULE_ENGINE [" Deterministic Verification & Scoring "]
+            RULEBOOK[("📖 Versioned Rulebook<br/><code>shard/rules/rulebook.py</code><br/><code>data/rulebook_v1.json</code><br/><i>Active Weights · Parameters · Version History</i>")]:::storeBox
+            TOOLS["🛠️ Deterministic Verification Tools<br/><code>shard/rules/tools.py</code><br/><i>1. Repair Benchmark · 2. Line-Item Discrepancy<br/>3. Vehicle Registration · 4. Write-Off Salvage<br/>5. Prior Damage Registry · 6. Staged Collision Graph</i>"]:::toolBox
+            INVESTIGATOR["🕵️ Investigator Agent<br/><code>shard/agents/investigator.py</code><br/><i>Executes Planned Tools · Aggregates Score (0-100)<br/>Emits Triage Recommendation & Auditable Findings</i>"]:::invBox
+        end
+    end
+
+    %% -------------------------------------------------------------------------
+    %% TRUST BOUNDARY 3: EVALUATION ZONE (GT ACCESSIBLE)
+    %% -------------------------------------------------------------------------
+    subgraph EVALUATION_ZONE [" TRUST BOUNDARY: Evaluation Zone (Authorised Ground-Truth Access) "]
+        CRITIC["⚖️ Critic Agent<br/><code>shard/agents/critic.py</code><br/><i>Fetches Hidden GT Labels · Computes Precision, Recall, F1, FPR<br/>Audits Consistency Violations · Builds Redacted Typology Miss Summary</i>"]:::evalBox
+    end
+
+    %% -------------------------------------------------------------------------
+    %% TRUST BOUNDARY 4: ADAPTATION & CONTROL IMPROVEMENT
+    %% -------------------------------------------------------------------------
+    subgraph ADAPTATION_ZONE [" TRUST BOUNDARY: Adaptation & Safety Zone (Zero Arbitrary Code) "]
+        RULE_WRITER["✍️ Rule-Writer Agent<br/><code>shard/agents/rule_writer.py</code><br/><i>Inspects Aggregate Misses · Proposes Parametric Updates (No eval/exec)</i>"]:::adaptBox
+        
+        subgraph VALIDATION_GATE [" Multi-Gate Safety Validator (shard/rules/validator.py) "]
+            GATE_A["Gate A: Schema & Bounds Check"]:::gateBox
+            GATE_B["Gate B: FP Budget Check on Frozen Genuine Claims"]:::gateBox
+            GATE_C["Gate C: Golden Set Non-Regression Check"]:::gateBox
+            GATE_D["Gate D: Measurable Diagnostic Justification"]:::gateBox
+        end
+    end
+
+    %% -------------------------------------------------------------------------
+    %% DATA FLOW AND CONNECTIONS
+    %% -------------------------------------------------------------------------
+
+    %% UI to Orchestrator
+    UI <-->|" Run Experiment / Session Results "| ORCH
+
+    %% Generation and Split
+    ORCH -->|" Round Trigger (Seed, Config) "| FRAUDSTER
+    FRAUDSTER -->|" Updated Typology Distribution "| GEN
+    GEN -->|" Observable Claim (NO GT) "| PLANNER
+    GEN -.->|" Hidden Label: is_fraud, typology "| VAULT
+
+    %% Investigation Pipeline
+    PLANNER -->|" Investigation Plan (Ordered Steps) "| RESEARCHER
+    RESEARCHER -->|" Evidence Bundle "| INVESTIGATOR
+    RULEBOOK -->|" Current Active Rules & Params "| INVESTIGATOR
+    INVESTIGATOR -->|" Execute Checks "| TOOLS
+    TOOLS -->|" Finding Results & Score Deltas "| INVESTIGATOR
+
+    %% Triage Decision
+    INVESTIGATOR -->|" ClaimDecision (APPROVE / REFER / SUSPECTED_FRAUD) "| ORCH
+    INVESTIGATOR -->|" Log Event "| AUDIT
+
+    %% Evaluation Path
+    ORCH -->|" Batch Decisions "| CRITIC
+    VAULT ==>|" Authorised GT Labels (claim_ids) "| CRITIC
+    CRITIC -->|" CriticReport (Metrics & Consistency) "| ORCH
+    CRITIC -->|" Log Event "| AUDIT
+
+    %% Adaptation Feedback Loop
+    ORCH -->|" Redacted Diagnostic Feedback (NO GT IDs) "| RULE_WRITER
+    ORCH -->|" Redacted Typology Misses (Counts Only) "| FRAUDSTER
+    RULE_WRITER -->|" Candidate RuleChange "| GATE_A
+    GATE_A --> GATE_B --> GATE_C --> GATE_D
+    GATE_D -->|" If Accepted: Bump Version (v1.0.0 -> v1.1.0) "| RULEBOOK
+    GATE_D -.->|" If Rejected: Log Rejection Reason (Budget Exceeded) "| AUDIT
+    RULE_WRITER -->|" Log Proposal & Validation Outcome "| AUDIT
+
+    %% Orchestrator Stopping & Reporting
+    ORCH -->|" Round Summary / Stopping Condition (Target Met / Max Rounds) "| AUDIT
+    AUDIT -->|" Full Event Stream & Export (.jsonl / .json) "| UI
