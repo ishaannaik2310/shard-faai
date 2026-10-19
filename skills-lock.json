@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "image-to-code": {
+      "source": "Leonxlnx/imagegen-skills",
+      "sourceType": "github",
+      "skillPath": "skills/image-to-code/SKILL.md",
+      "computedHash": "3d2ac14d956fdafc5500d2108b90895e134d847f9f199e7f1d18bf1f814cf7c8"
+    }
+  }
+}

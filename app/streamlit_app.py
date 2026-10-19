@@ -28,8 +28,12 @@ from app.presentation import (
     THEME_COLORS,
     build_audit_log_dataframe,
     build_claims_dataframe,
+    build_cross_round_typology_dataframe,
+    build_discovery_candidates_dataframe,
+    build_discovery_ranking_dataframe,
     build_rounds_summary_dataframe,
     build_typology_metrics_dataframe,
+    build_v3_metrics_progression_dataframe,
     create_confusion_matrix_heatmap,
     create_metrics_progression_chart,
     format_currency,
@@ -79,6 +83,16 @@ with st.sidebar:
     st.title("🛡️ SHARD Control Room")
     st.caption("Adversarial Multi-Agent Claims Auditor (CA-3)")
 
+    st.markdown("### 🧬 SHARD v3 Upgrade")
+    enable_v3_discovery = st.checkbox(
+        "Enable SHARD v3 Feature Discovery",
+        value=False,
+        help="Activate generic discovery and adaptation against unmodelled fraud patterns (Phase 2b).",
+    )
+
+    if enable_v3_discovery:
+        st.info("🧬 **v3 Demo Preset Active**: 120 claims/round, 30% fraud, 4 rounds, start round 2, early stop off.")
+
     st.markdown("### ⚙️ Experiment Parameters")
 
     base_seed = st.number_input(
@@ -93,9 +107,10 @@ with st.sidebar:
     claims_per_round = st.slider(
         "Claims per Round",
         min_value=10,
-        max_value=100,
-        value=30,
+        max_value=200,
+        value=120 if enable_v3_discovery else 30,
         step=5,
+        key=f"claims_per_round_{'v3' if enable_v3_discovery else 'v2'}",
         help="Volume of synthetic motor claims generated in each round.",
     )
 
@@ -103,9 +118,10 @@ with st.sidebar:
         "Synthetic Fraud Share",
         min_value=0.10,
         max_value=0.70,
-        value=0.40,
+        value=0.30 if enable_v3_discovery else 0.40,
         step=0.05,
         format="%.2f",
+        key=f"fraud_share_{'v3' if enable_v3_discovery else 'v2'}",
         help="Proportion of fraudulent claims injected per round.",
     )
 
@@ -113,10 +129,23 @@ with st.sidebar:
         "Maximum Rounds",
         min_value=1,
         max_value=8,
-        value=3,
+        value=4 if enable_v3_discovery else 3,
         step=1,
+        key=f"max_rounds_{'v3' if enable_v3_discovery else 'v2'}",
         help="Maximum closed-loop adaptation rounds before stopping.",
     )
+
+    if enable_v3_discovery:
+        v3_start_round = st.number_input(
+            "V3 Typology Start Round",
+            min_value=1,
+            max_value=8,
+            value=2,
+            step=1,
+            help="Round at which the unmodelled fraud typology begins appearing.",
+        )
+    else:
+        v3_start_round = 2
 
     st.markdown("### 🎯 Stopping Thresholds")
 
@@ -142,7 +171,8 @@ with st.sidebar:
 
     early_stopping = st.checkbox(
         "Enable Early Stopping",
-        value=True,
+        value=False if enable_v3_discovery else True,
+        key=f"early_stopping_{'v3' if enable_v3_discovery else 'v2'}",
         help="Halt experiment immediately when target recall and FPR are achieved.",
     )
 
@@ -195,7 +225,9 @@ with st.sidebar:
             • Seed: {base_seed} | Batch: {claims_per_round} claims<br>
             • Fraud: {fraud_share:.0%} | Max Rounds: {max_rounds}<br>
             • Early Stop: {'On' if early_stopping else 'Off'} (Recall ≥ {target_recall:.0%})<br>
-            • Safeguard: FP Budget ≤ {fp_budget:.0%}
+            • Safeguard: FP Budget ≤ {fp_budget:.0%}<br>
+            • Feature Discovery: {'Enabled (v3)' if enable_v3_discovery else 'Disabled (v2 baseline)'}
+            {f'<br>• Typology Start: Round {v3_start_round}' if enable_v3_discovery else ''}
         </div>
         """,
         unsafe_allow_html=True,
@@ -220,6 +252,10 @@ if run_clicked:
             fp_budget=float(fp_budget),
             early_stopping=bool(early_stopping),
             audit_log_path=audit_path.strip() if audit_path.strip() else None,
+            enable_feature_discovery=bool(enable_v3_discovery),
+            include_v3_typologies=bool(enable_v3_discovery),
+            v3_typology_start_round=int(v3_start_round),
+            min_missed_samples=8,
         )
 
         with st.spinner("Executing multi-round adversarial simulation across agents..."):
@@ -640,6 +676,12 @@ else:
         else:
             st.info("No fraudulent claims evaluated in this round.")
 
+        st.markdown("#### 📈 Multi-Round Typology Detection Trajectory")
+        st.caption("Cross-round performance tracking for all typologies, highlighting mitigation of unmodelled fraud evasion.")
+        cross_df = build_cross_round_typology_dataframe(res)
+        if not cross_df.empty:
+            st.dataframe(cross_df, use_container_width=True, hide_index=True)
+
         st.markdown("#### ⚠️ Consistency & Integrity Audits")
         if crit_rep.consistency_violations:
             st.error(f"Detected {len(crit_rep.consistency_violations)} consistency violations:")
@@ -675,6 +717,120 @@ else:
                 "Description": r_def.description,
             })
         st.dataframe(pd.DataFrame(rule_rows), use_container_width=True, hide_index=True)
+
+        # -------------------------------------------------------------------
+        # SHARD v3 Feature Discovery & Dynamic Adaptation
+        # -------------------------------------------------------------------
+        st.markdown('<div class="section-header">🧬 SHARD v3 Feature Discovery & Dynamic Adaptation</div>', unsafe_allow_html=True)
+
+        if not res.config.enable_feature_discovery:
+            st.info(
+                "ℹ️ **Feature Discovery Disabled (v2 Baseline Mode)**: The system executed using static baseline rules and "
+                "parameter tuning. To enable autonomous discovery of unmodelled fraud typologies (Phase 2b), "
+                "check **Enable SHARD v3 Feature Discovery** in the sidebar."
+            )
+        else:
+            disc_events = (
+                st.session_state.audit_logger.get_events_by_type("DISCOVERY_RANKING")
+                if st.session_state.audit_logger
+                else []
+            )
+            all_audit_records_v3: List[Any] = [rec for r in res.rounds for rec in r.rule_audit_records]
+            disc_records = [
+                r for r in all_audit_records_v3
+                if getattr(r, "proposal_id", "").startswith("PROP-DISC-")
+                or getattr(r, "rule_id", "").startswith("RULE_DISCOVERED_")
+            ]
+
+            if not disc_events and not disc_records:
+                st.warning(
+                    f"⚠️ Discovery was enabled, but no unmodelled pattern accumulated enough evidence "
+                    f"(minimum {res.config.min_missed_samples} missed samples required) to trigger ranking."
+                )
+            else:
+                latest_ranking = disc_events[-1].payload if disc_events else None
+                chosen_feature = latest_ranking.get("chosen_feature", "N/A") if latest_ranking else "N/A"
+                n_missed = latest_ranking.get("n_missed", 0) if latest_ranking else 0
+                n_ref = latest_ranking.get("n_reference", 0) if latest_ranking else 0
+                installed_cnt = sum(
+                    1 for r in res.final_rulebook.rules if r.rule_id.startswith("RULE_DISCOVERED_")
+                )
+
+                d_c1, d_c2, d_c3, d_c4 = st.columns(4)
+                with d_c1:
+                    st.markdown(
+                        f"""
+                        <div class="kpi-card">
+                            <div class="kpi-title">Discovered Feature</div>
+                            <div class="kpi-value" style="font-size:1.05rem; color:{THEME_COLORS['accent_blue']};">{chosen_feature}</div>
+                            <div class="kpi-subtext">Selected by separation score</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                with d_c2:
+                    top_score = (
+                        latest_ranking["ranked_features"][0]["separation_score"]
+                        if latest_ranking and latest_ranking.get("ranked_features")
+                        else 0.0
+                    )
+                    st.markdown(
+                        f"""
+                        <div class="kpi-card">
+                            <div class="kpi-title">Separation Score</div>
+                            <div class="kpi-value" style="color:{THEME_COLORS['approve']};">{top_score:.4f}</div>
+                            <div class="kpi-subtext">SMD + Tail Separation</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                with d_c3:
+                    st.markdown(
+                        f"""
+                        <div class="kpi-card">
+                            <div class="kpi-title">Evidence Base</div>
+                            <div class="kpi-value">{n_missed} missed</div>
+                            <div class="kpi-subtext">{n_ref} genuine reference</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                with d_c4:
+                    st.markdown(
+                        f"""
+                        <div class="kpi-card">
+                            <div class="kpi-title">Discovered Rules</div>
+                            <div class="kpi-value">{installed_cnt} active</div>
+                            <div class="kpi-subtext">Rulebook v{res.final_rulebook_version}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                st.markdown("##### 1. Ranked Observable Features (Generic Separation)")
+                st.caption(
+                    "Features ranked generically across missed vs reference claims without typology labels. "
+                    "Score combines standardized mean difference (SMD) and tail excess beyond reference p95."
+                )
+                ranking_df = build_discovery_ranking_dataframe(latest_ranking)
+                if not ranking_df.empty:
+                    st.dataframe(ranking_df, use_container_width=True, hide_index=True)
+
+                st.markdown("##### 2. Candidate Thresholds & Validation Gate Outcomes")
+                st.caption(
+                    "Thresholds derived from reference percentiles are tested against Gates A–D "
+                    "(Template, Schema, Logic, and Gate B FP Budget ≤ 10%) before installation."
+                )
+                candidates_df = build_discovery_candidates_dataframe(all_audit_records_v3)
+                if not candidates_df.empty:
+                    st.dataframe(candidates_df, use_container_width=True, hide_index=True)
+
+                st.markdown("##### 3. Multi-Round Trajectory & Typology Mitigation")
+                st.caption(
+                    "Observed detection metrics and unmodelled fraud evasion/mitigation across all execution rounds."
+                )
+                v3_traj_df = build_v3_metrics_progression_dataframe(res)
+                st.dataframe(v3_traj_df, use_container_width=True, hide_index=True)
 
         st.markdown("#### 🔍 Rule-Writer Adaptation History Across Rounds")
         all_audit_records: List[Any] = [rec for r in res.rounds for rec in r.rule_audit_records]

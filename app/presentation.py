@@ -485,3 +485,106 @@ def create_confusion_matrix_heatmap(report: CriticReport) -> go.Figure:
     )
 
     return fig
+
+
+def build_discovery_ranking_dataframe(payload: Optional[Dict[str, Any]]) -> pd.DataFrame:
+    """Construct tabular representation of generic observable feature separation rankings."""
+    if not payload or "ranked_features" not in payload:
+        return pd.DataFrame(columns=[
+            "Rank", "Feature", "Direction", "Separation Score", "SMD",
+            "Tail Share", "Missed Mean", "Reference Mean", "Outcome",
+        ])
+    rows = []
+    chosen = payload.get("chosen_feature")
+    for rank, rf in enumerate(payload["ranked_features"], 1):
+        fname = rf.get("feature_name", "")
+        score = rf.get("separation_score", 0.0)
+        smd = rf.get("standardized_mean_diff", rf.get("smd", 0.0))
+        tail = rf.get("tail_separation_share", rf.get("tail_share_missed", 0.0))
+        direction = rf.get("direction", "")
+        missed_mean = rf.get("missed_mean", 0.0)
+        ref_mean = rf.get("reference_mean", 0.0)
+        status = "SELECTED" if fname == chosen else "Evaluated"
+        rows.append({
+            "Rank": rank,
+            "Feature": fname,
+            "Direction": direction,
+            "Separation Score": f"{score:.4f}",
+            "SMD": f"{smd:.4f}",
+            "Tail Share": f"{tail * 100:.1f}%",
+            "Missed Mean": f"{missed_mean:.2f}",
+            "Reference Mean": f"{ref_mean:.2f}",
+            "Outcome": status,
+        })
+    return pd.DataFrame(rows)
+
+
+def build_discovery_candidates_dataframe(records: Sequence[Any]) -> pd.DataFrame:
+    """Construct tabular representation of candidate thresholds and validation gate results."""
+    rows = []
+    disc_records = [
+        r for r in records
+        if getattr(r, "proposal_id", "").startswith("PROP-DISC-")
+        or getattr(r, "rule_id", "").startswith("RULE_DISCOVERED_")
+    ]
+    for r in disc_records:
+        rows.append({
+            "Proposal ID": r.proposal_id,
+            "Target Rule": r.rule_id,
+            "Candidate Threshold": f"{r.candidate_value}",
+            "Status": r.status,
+            "Gate Outcome": r.gate_failed if r.gate_failed else "Passed (Gates A–D)",
+            "Validation FPR": f"{r.validation_fp_rate * 100:.2f}%",
+            "Version Transition": f"v{r.rulebook_version_before} ➔ v{r.rulebook_version_after}",
+            "Details": r.rejection_reason if r.status == "REJECTED" else r.rationale,
+        })
+    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=[
+        "Proposal ID", "Target Rule", "Candidate Threshold", "Status",
+        "Gate Outcome", "Validation FPR", "Version Transition", "Details",
+    ])
+
+
+def build_cross_round_typology_dataframe(res: ExperimentResult) -> pd.DataFrame:
+    """Construct breakdown of fraud typology detection across all experiment rounds."""
+    all_typologies = set()
+    for r in res.rounds:
+        for t in r.critic_report.typology_metrics.keys():
+            all_typologies.add(t)
+    ordered_typologies = sorted(list(all_typologies))
+    rows = []
+    for typ in ordered_typologies:
+        row = {"Typology": typ}
+        total_caught = 0
+        total_cases = 0
+        for r in res.rounds:
+            m = r.critic_report.typology_metrics.get(typ)
+            if m:
+                row[f"Round {r.round_number}"] = f"{m.caught_cases}/{m.total_cases} ({m.detection_rate * 100:.0f}%)"
+                total_caught += m.caught_cases
+                total_cases += m.total_cases
+            else:
+                row[f"Round {r.round_number}"] = "—"
+        overall_rate = (total_caught / total_cases * 100) if total_cases > 0 else 0.0
+        row["Overall"] = f"{total_caught}/{total_cases} ({overall_rate:.1f}%)"
+        rows.append(row)
+    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["Typology", "Overall"])
+
+
+def build_v3_metrics_progression_dataframe(res: ExperimentResult) -> pd.DataFrame:
+    """Construct multi-round progression table including unmodelled typology catch rates."""
+    rows = []
+    for r in res.rounds:
+        cr = r.critic_report
+        delayed = cr.typology_metrics.get("DELAYED_FILING")
+        delayed_str = f"{delayed.caught_cases}/{delayed.total_cases} ({delayed.detection_rate * 100:.0f}%)" if delayed else "—"
+        rows.append({
+            "Round": f"Round {r.round_number}",
+            "Claims": r.claims_count,
+            "Precision": f"{cr.precision * 100:.1f}%",
+            "Recall": f"{cr.recall * 100:.1f}%",
+            "FPR": f"{cr.fpr * 100:.1f}%",
+            "DELAYED_FILING Catch Rate": delayed_str,
+            "Rulebook Version": f"v{r.rulebook_version_after}",
+        })
+    return pd.DataFrame(rows)
+
