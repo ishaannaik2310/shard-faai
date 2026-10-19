@@ -212,10 +212,15 @@ def build_golden_regression_set() -> Tuple[Tuple[Claim, str, str], ...]:
 # Validation Dataset Generator
 # ---------------------------------------------------------------------------
 
+GATE_B_V2_SEED: int = 9999
+GATE_B_V3_SEED: int = 8888
+GATE_B_SEEDS: Set[int] = {GATE_B_V2_SEED, GATE_B_V3_SEED}
+
 _CACHED_VALIDATION_CLAIMS: Optional[Tuple[Claim, ...]] = None
+_CACHED_V3_VALIDATION_CLAIMS: Optional[Tuple[Claim, ...]] = None
 
 
-def get_default_validation_dataset(n_claims: int = 40, seed: int = 9999) -> Tuple[Claim, ...]:
+def get_default_validation_dataset(n_claims: int = 40, seed: int = GATE_B_V2_SEED) -> Tuple[Claim, ...]:
     """
     Generate or return a cached, fixed validation dataset consisting exclusively
     of genuine synthetic claims (fraud_share=0.0).

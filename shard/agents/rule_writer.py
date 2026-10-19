@@ -23,7 +23,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from shard.core.models import (
     CriticFeedbackSummary,
     CriticReport,
-    FraudTypology,
     RuleAuditRecord,
     RuleProposal,
     RuleValidationResult,
@@ -126,19 +125,19 @@ class RuleWriterAgent:
         target_mappings: List[Tuple[str, str, str, str]] = [
             # (Typology, Rule ID, Parameter, Direction)
             (
-                FraudTypology.EXAGGERATED_REPAIR.value,
+                "EXAGGERATED_REPAIR",
                 "RULE_REPAIR_BENCHMARK",
                 "max_markup_ratio",
                 "TIGHTEN",
             ),
             (
-                FraudTypology.OPPORTUNISTIC_INFLATION.value,
+                "OPPORTUNISTIC_INFLATION",
                 "RULE_LINE_ITEM_ARITHMETIC",
                 "max_discrepancy_gbp",
                 "TIGHTEN",
             ),
             (
-                FraudTypology.STAGED_COLLISION.value,
+                "STAGED_COLLISION",
                 "RULE_STAGED_COLLISION_INDICATORS",
                 "min_policy_age_days",
                 "EXPAND",

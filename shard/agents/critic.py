@@ -20,8 +20,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 import datetime
+import math
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
+from shard.core.discovery_models import DiscoveryFeedback, FeatureAggregateStats
+from shard.core.features import FEATURE_WHITELIST, extract_feature
 from shard.core.models import (
     Claim,
     ClaimDecision,
@@ -34,6 +37,78 @@ from shard.data.vault import GroundTruthVault
 from shard.rules.rulebook import Rulebook, load_default_rulebook
 
 
+def _quantile(sorted_vals: List[float], q: float) -> float:
+    """Compute empirical quantile using linear interpolation."""
+    n = len(sorted_vals)
+    if n == 0:
+        return 0.0
+    if n == 1:
+        return sorted_vals[0]
+    idx = (q / 100.0) * (n - 1)
+    low = int(math.floor(idx))
+    high = int(math.ceil(idx))
+    weight = idx - low
+    return sorted_vals[low] * (1.0 - weight) + sorted_vals[high] * weight
+
+
+def _compute_feature_stats(
+    values: Sequence[float],
+    ref_p95: Optional[float] = None,
+    ref_p5: Optional[float] = None,
+    ref_mean: Optional[float] = None,
+) -> FeatureAggregateStats:
+    """Compute aggregate distribution statistics for a numeric observable feature."""
+    if not values:
+        return FeatureAggregateStats(
+            count=0,
+            mean=0.0,
+            std=0.0,
+            p5=0.0,
+            p50=0.0,
+            p95=0.0,
+            p97=0.0,
+            p99=0.0,
+            min=0.0,
+            max=0.0,
+            tail_share_beyond_ref_p95=0.0,
+        )
+
+    vals = sorted(values)
+    count = len(vals)
+    mean = sum(vals) / count
+    variance = sum((v - mean) ** 2 for v in vals) / (count - 1) if count > 1 else 0.0
+    std = math.sqrt(max(0.0, variance))
+
+    p5 = _quantile(vals, 5.0)
+    p50 = _quantile(vals, 50.0)
+    p95 = _quantile(vals, 95.0)
+    p97 = _quantile(vals, 97.0)
+    p99 = _quantile(vals, 99.0)
+    min_val = vals[0]
+    max_val = vals[-1]
+
+    tail_share = 0.0
+    if ref_p95 is not None and ref_p5 is not None and ref_mean is not None and count > 0:
+        if mean >= ref_mean:
+            tail_share = sum(1 for v in vals if v > ref_p95) / count
+        else:
+            tail_share = sum(1 for v in vals if v < ref_p5) / count
+
+    return FeatureAggregateStats(
+        count=count,
+        mean=round(mean, 4),
+        std=round(std, 4),
+        p5=round(p5, 4),
+        p50=round(p50, 4),
+        p95=round(p95, 4),
+        p97=round(p97, 4),
+        p99=round(p99, 4),
+        min=round(min_val, 4),
+        max=round(max_val, 4),
+        tail_share_beyond_ref_p95=round(tail_share, 4),
+    )
+
+
 class CriticAgent:
     """
     Independent evaluation agent with controlled access to GroundTruthVault.
@@ -42,6 +117,23 @@ class CriticAgent:
     diagnoses missed fraud patterns, and produces structured CriticReports.
     """
 
+    def __init__(
+        self,
+        enable_discovery: bool = False,
+        min_missed_samples: int = 8,
+    ) -> None:
+        self.enable_discovery = enable_discovery
+        self.min_missed_samples = min_missed_samples
+        self._accumulated_missed_claims: List[Claim] = []
+        self._accumulated_reference_claims: List[Claim] = []
+        self._seen_claim_ids: Set[str] = set()
+
+    def reset_accumulated_evidence(self) -> None:
+        """Reset accumulated missed and reference claims."""
+        self._accumulated_missed_claims.clear()
+        self._accumulated_reference_claims.clear()
+        self._seen_claim_ids.clear()
+
     def evaluate(
         self,
         decisions: Sequence[ClaimDecision],
@@ -49,6 +141,7 @@ class CriticAgent:
         claims: Optional[Sequence[Claim]] = None,
         rulebook: Optional[Rulebook] = None,
         round_number: int = 1,
+        round_seed: Optional[int] = None,
     ) -> CriticReport:
         """
         Evaluate an ordered sequence of ClaimDecision records against the ground truth.
@@ -87,6 +180,13 @@ class CriticAgent:
 
         # Determine target claim set
         target_ids: Set[str] = set(claims_by_id.keys()) if claims_by_id else set(vault.claim_ids())
+
+        if self.enable_discovery and round_seed is not None:
+            from shard.rules.validator import GATE_B_SEEDS
+            if round_seed in GATE_B_SEEDS:
+                raise AssertionError(
+                    f"Round seed {round_seed} matches Gate B validation seeds {GATE_B_SEEDS}"
+                )
 
         violations: List[ConsistencyViolation] = []
         seen_decision_ids: Set[str] = set()
@@ -296,6 +396,18 @@ class CriticAgent:
                     approved_genuine_ids.append(decision.claim_id)
                     approved_genuine_gbp += claimed_amt
 
+            if (
+                self.enable_discovery
+                and decision.claim_id not in self._seen_claim_ids
+                and decision.claim_id in claims_by_id
+            ):
+                self._seen_claim_ids.add(decision.claim_id)
+                claim_obj = claims_by_id[decision.claim_id]
+                if gt.is_fraud and not is_flagged:
+                    self._accumulated_missed_claims.append(claim_obj)
+                elif not gt.is_fraud:
+                    self._accumulated_reference_claims.append(claim_obj)
+
         total_evaluated = tp + fp + tn + fn
 
         # Safe metric divisions with documented 0.0 default for zero denominators
@@ -339,6 +451,52 @@ class CriticAgent:
             "total_claimed_gbp": round(total_claimed_gbp, 2),
         }
 
+        # Discovery feedback computation
+        discovery_feedback: Optional[DiscoveryFeedback] = None
+        if self.enable_discovery:
+            if self._accumulated_reference_claims:
+                from shard.rules.validator import get_default_validation_dataset, GATE_B_V2_SEED
+                gate_b_claims = get_default_validation_dataset(seed=GATE_B_V2_SEED)
+                gate_b_ids = {c.claim_id for c in gate_b_claims}
+                ref_ids = {c.claim_id for c in self._accumulated_reference_claims}
+                assert ref_ids.isdisjoint(gate_b_ids), (
+                    f"Discovery reference claims overlap with Gate B validation claims: {ref_ids & gate_b_ids}"
+                )
+
+            n_missed = len(self._accumulated_missed_claims)
+            n_reference = len(self._accumulated_reference_claims)
+            has_sufficient = n_missed >= self.min_missed_samples
+
+            features_dict: Dict[str, Tuple[FeatureAggregateStats, FeatureAggregateStats]] = {}
+            for feat_name in sorted(FEATURE_WHITELIST.keys()):
+                m_vals = [
+                    extract_feature(c, feat_name) for c in self._accumulated_missed_claims
+                ]
+                m_vals_clean = [v for v in m_vals if v is not None and math.isfinite(v)]
+
+                r_vals = [
+                    extract_feature(c, feat_name) for c in self._accumulated_reference_claims
+                ]
+                r_vals_clean = [v for v in r_vals if v is not None and math.isfinite(v)]
+
+                r_stats = _compute_feature_stats(r_vals_clean)
+                m_stats = _compute_feature_stats(
+                    m_vals_clean,
+                    ref_p95=r_stats.p95,
+                    ref_p5=r_stats.p5,
+                    ref_mean=r_stats.mean,
+                )
+                features_dict[feat_name] = (m_stats, r_stats)
+
+            discovery_feedback = DiscoveryFeedback(
+                round_number=round_number,
+                n_missed=n_missed,
+                n_reference=n_reference,
+                features=features_dict,
+                min_missed_samples=self.min_missed_samples,
+                has_sufficient_evidence=has_sufficient,
+            )
+
         generated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         return CriticReport(
@@ -363,4 +521,5 @@ class CriticAgent:
             approved_genuine_claim_ids=tuple(approved_genuine_ids),
             round_number=round_number,
             generated_at=generated_at,
+            discovery_feedback=discovery_feedback,
         )

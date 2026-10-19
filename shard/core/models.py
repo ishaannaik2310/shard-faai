@@ -271,9 +271,10 @@ class CriticReport:
     approved_genuine_claim_ids: Tuple[str, ...] = field(default_factory=tuple)
     round_number: int = 1
     generated_at: str = ""
+    discovery_feedback: Optional[Any] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "round_number": self.round_number,
             "total_evaluated": self.total_evaluated,
             "confusion_matrix": {
@@ -306,6 +307,13 @@ class CriticReport:
             ],
             "generated_at": self.generated_at,
         }
+        if self.discovery_feedback is not None:
+            d["discovery_feedback"] = (
+                self.discovery_feedback.to_dict()
+                if hasattr(self.discovery_feedback, "to_dict")
+                else self.discovery_feedback
+            )
+        return d
 
 
 @dataclass(frozen=True)
