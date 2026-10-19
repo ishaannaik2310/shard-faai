@@ -407,6 +407,68 @@ def tpl_staged_collision(
     )
 
 
+def tpl_feature_threshold(
+    claim: Claim,
+    score_contribution: float = 20.0,
+    severity: str = "MEDIUM",
+    rule_id: str = "RULE_DISCOVERED_001",
+    check_name: str = "Discovered Observable Feature Threshold",
+    feature: str = "",
+    direction: str = ">",
+    threshold: float = 0.0,
+    **kwargs: Any,
+) -> ToolCheckResult:
+    """
+    Generic parameterised evaluation template that extracts an observable
+    whitelisted numeric feature from a Claim and compares it against a threshold.
+    """
+    from shard.core.features import extract_feature, FEATURE_WHITELIST
+
+    if feature not in FEATURE_WHITELIST:
+        raise ValueError(f"Feature '{feature}' is not on the observable feature whitelist")
+
+    val = extract_feature(claim, feature)
+    if val is None:
+        return ToolCheckResult(
+            rule_id=rule_id,
+            check_name=check_name,
+            triggered=False,
+            score_contribution=score_contribution,
+            severity="NONE",
+            observed_value=None,
+            threshold_value=threshold,
+            detail=f"Observable feature '{feature}' could not be computed from claim.",
+        )
+
+    if direction == ">":
+        triggered = val >= threshold
+        detail = (
+            f"Observable feature '{feature}' value {val} breached upper threshold {threshold}."
+            if triggered
+            else f"Observable feature '{feature}' value {val} conforms to normal range (< {threshold})."
+        )
+    elif direction == "<":
+        triggered = val <= threshold
+        detail = (
+            f"Observable feature '{feature}' value {val} breached lower threshold {threshold}."
+            if triggered
+            else f"Observable feature '{feature}' value {val} conforms to normal range (> {threshold})."
+        )
+    else:
+        raise ValueError(f"Invalid threshold direction '{direction}', must be '>' or '<'")
+
+    return ToolCheckResult(
+        rule_id=rule_id,
+        check_name=check_name,
+        triggered=triggered,
+        score_contribution=score_contribution,
+        severity=severity if triggered else "NONE",
+        observed_value=val,
+        threshold_value=threshold,
+        detail=detail,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Central Template Registry
 # ---------------------------------------------------------------------------
@@ -418,4 +480,7 @@ TEMPLATE_REGISTRY: Dict[str, Callable[..., ToolCheckResult]] = {
     "TPL_WRITE_OFF_STATUS": tpl_vehicle_write_off,
     "TPL_PRIOR_DAMAGE": tpl_prior_damage,
     "TPL_STAGED_COLLISION": tpl_staged_collision,
+    "tpl_feature_threshold": tpl_feature_threshold,
+    "TPL_FEATURE_THRESHOLD": tpl_feature_threshold,
 }
+

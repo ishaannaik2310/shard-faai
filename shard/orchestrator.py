@@ -65,6 +65,10 @@ class OrchestratorConfig:
     fp_budget: float = 0.10
     early_stopping: bool = True
     audit_log_path: Optional[str] = None
+    enable_feature_discovery: bool = False
+    include_v3_typologies: bool = False
+    v3_typology_start_round: int = 2
+    min_missed_samples: int = 8
 
     def __post_init__(self) -> None:
         if self.n_claims_per_round < 1:
@@ -81,6 +85,10 @@ class OrchestratorConfig:
             raise ValueError(f"adaptation_strength must be >= 0.0, got {self.adaptation_strength}")
         if not (0.0 <= self.fp_budget <= 1.0):
             raise ValueError(f"fp_budget must be between 0.0 and 1.0, got {self.fp_budget}")
+        if self.v3_typology_start_round < 1:
+            raise ValueError(f"v3_typology_start_round must be >= 1, got {self.v3_typology_start_round}")
+        if self.min_missed_samples < 1:
+            raise ValueError(f"min_missed_samples must be >= 1, got {self.min_missed_samples}")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -94,6 +102,10 @@ class OrchestratorConfig:
             "fp_budget": self.fp_budget,
             "early_stopping": self.early_stopping,
             "audit_log_path": self.audit_log_path,
+            "enable_feature_discovery": self.enable_feature_discovery,
+            "include_v3_typologies": self.include_v3_typologies,
+            "v3_typology_start_round": self.v3_typology_start_round,
+            "min_missed_samples": self.min_missed_samples,
         }
 
 
@@ -202,17 +214,35 @@ class Orchestrator:
         self.config = config or OrchestratorConfig()
         self.initial_rulebook = initial_rulebook or load_default_rulebook()
         self.investigation_pipeline = investigation_pipeline or InvestigationPipeline()
-        self.critic = critic or CriticAgent()
+        self.critic = critic or CriticAgent(
+            enable_discovery=self.config.enable_feature_discovery,
+            min_missed_samples=self.config.min_missed_samples,
+        )
         self.fraudster = fraudster or FraudsterAgent(
             base_seed=self.config.base_seed,
             adaptation_strength=self.config.adaptation_strength,
+            include_v3_typologies=self.config.include_v3_typologies or self.config.enable_feature_discovery,
+            v3_typology_start_round=self.config.v3_typology_start_round,
         )
         self.rule_writer = rule_writer or RuleWriterAgent(
-            validator=RuleValidator(fp_budget=self.config.fp_budget),
+            validator=RuleValidator(
+                fp_budget=self.config.fp_budget,
+                v3_mode=self.config.enable_feature_discovery,
+            ),
         )
         self.audit_logger = audit_logger or AuditLogger(
             log_path=self.config.audit_log_path,
         )
+
+        if self.config.enable_feature_discovery:
+            self.critic.enable_discovery = True
+            self.critic.min_missed_samples = self.config.min_missed_samples
+            self.fraudster.include_v3_typologies = True
+            self.fraudster.v3_typology_start_round = self.config.v3_typology_start_round
+            self.rule_writer.validator.v3_mode = True
+        elif self.config.include_v3_typologies:
+            self.fraudster.include_v3_typologies = True
+            self.fraudster.v3_typology_start_round = self.config.v3_typology_start_round
 
     def run(self) -> ExperimentResult:
         """
@@ -283,6 +313,7 @@ class Orchestrator:
                 claims=batch.claims,
                 rulebook=active_rulebook,
                 round_number=round_num,
+                round_seed=round_seed,
             )
             self.audit_logger.log_critic_report(
                 report=critic_report,
@@ -322,9 +353,16 @@ class Orchestrator:
                     active_rulebook=active_rulebook,
                     feedback=previous_feedback,
                     round_number=round_num,
+                    discovery_feedback=critic_report.discovery_feedback,
                 )
                 round_proposals = writer_out.proposals
                 round_audit_records = writer_out.audit_records
+
+                if writer_out.discovery_ranking:
+                    self.audit_logger.log_discovery_ranking(
+                        ranking_payload=writer_out.discovery_ranking,
+                        round_number=round_num,
+                    )
 
                 for p in round_proposals:
                     self.audit_logger.log_rule_proposal(p, round_number=round_num)

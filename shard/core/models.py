@@ -391,9 +391,10 @@ class RuleProposal:
     rationale: str
     target_typology: str
     expected_effect: str = ""
+    rule_parameters: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "proposal_id": self.proposal_id,
             "round_number": self.round_number,
             "rule_id": self.rule_id,
@@ -405,6 +406,9 @@ class RuleProposal:
             "target_typology": self.target_typology,
             "expected_effect": self.expected_effect,
         }
+        if self.rule_parameters is not None:
+            d["rule_parameters"] = dict(self.rule_parameters)
+        return d
 
 
 @dataclass(frozen=True)

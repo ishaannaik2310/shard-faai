@@ -39,6 +39,7 @@ class RuleWriterOutput:
     audit_records: Tuple[RuleAuditRecord, ...]
     accepted: bool
     summary: str
+    discovery_ranking: Optional[Dict[str, Any]] = None
 
 
 class RuleWriterAgent:
@@ -217,21 +218,13 @@ class RuleWriterAgent:
         active_rulebook: Rulebook,
         feedback: Optional[Union[CriticFeedbackSummary, CriticReport, Dict[str, Any]]],
         round_number: int = 1,
+        discovery_feedback: Optional[Any] = None,
     ) -> RuleWriterOutput:
         """
         Generate candidate rule proposals, submit to validation gate, and return
         the resulting active Rulebook and complete audit trail records.
         """
         proposals = self.generate_proposals(active_rulebook, feedback, round_number=round_number)
-
-        if not proposals:
-            return RuleWriterOutput(
-                active_rulebook=active_rulebook.clone(),
-                proposals=(),
-                audit_records=(),
-                accepted=False,
-                summary=f"Round {round_number}: No justified parameter adjustments identified from feedback.",
-            )
 
         audit_records: List[RuleAuditRecord] = []
         current_book = active_rulebook.clone()
@@ -280,6 +273,139 @@ class RuleWriterAgent:
 
             audit_records.append(record)
 
+        # If baseline templates did not yield an accepted update and discovery feedback is available, run generic discovery
+        discovery_ranking_payload: Optional[Dict[str, Any]] = None
+        if (
+            not any_accepted
+            and discovery_feedback is not None
+            and getattr(discovery_feedback, "has_sufficient_evidence", False)
+        ):
+            from shard.discovery.ranking import rank_features
+            ranked_features, rank_status = rank_features(discovery_feedback)
+            if rank_status == "OK" and ranked_features:
+                discovery_ranking_payload = {
+                    "ranked_features": [rf.to_dict() for rf in ranked_features],
+                    "chosen_feature": ranked_features[0].feature_name,
+                    "n_missed": discovery_feedback.n_missed,
+                    "n_reference": discovery_feedback.n_reference,
+                    "round_number": round_number,
+                }
+                top = ranked_features[0]
+                missed_stats, ref_stats = discovery_feedback.features[top.feature_name]
+
+                # Derive candidates from reference distribution ordered tightest to loosest
+                if top.direction == ">":
+                    raw_candidates = [
+                        ("p95", ref_stats.p95),
+                        ("p97", ref_stats.p97),
+                        ("p99", ref_stats.p99),
+                        ("max", ref_stats.max),
+                    ]
+                else:
+                    raw_candidates = [
+                        ("p5", ref_stats.p5),
+                        ("min", ref_stats.min),
+                    ]
+
+                seen_thresh_vals = set()
+                ordered_candidates: List[Tuple[str, float]] = []
+                for q_name, q_val in raw_candidates:
+                    val = round(q_val, 2) if top.feature_name == "markup_ratio" else float(round(q_val))
+                    if val not in seen_thresh_vals:
+                        seen_thresh_vals.add(val)
+                        ordered_candidates.append((q_name, val))
+
+                existing_disc_count = sum(
+                    1 for r in current_book.rules if r.rule_id.startswith("RULE_DISCOVERED_")
+                )
+                rule_id = f"RULE_DISCOVERED_{existing_disc_count + 1:03d}"
+
+                discovery_proposals: List[RuleProposal] = []
+                for q_name, thresh_val in ordered_candidates:
+                    proposal_id = f"PROP-DISC-{round_number:02d}-{top.feature_name}-{q_name}"
+                    rationale = (
+                        f"Discovered rule candidate from {top.feature_name} (separation score {top.separation_score:.4f}). "
+                        f"Evaluating threshold {thresh_val} from reference {q_name}."
+                    )
+                    disc_proposal = RuleProposal(
+                        proposal_id=proposal_id,
+                        round_number=round_number,
+                        rule_id=rule_id,
+                        template_id="tpl_feature_threshold",
+                        parameter_name="threshold",
+                        old_value=None,
+                        candidate_value=thresh_val,
+                        rationale=rationale,
+                        target_typology="DISCOVERED_PATTERN",
+                        expected_effect=f"Flag claims with {top.feature_name} {top.direction} {thresh_val}",
+                        rule_parameters={
+                            "feature": top.feature_name,
+                            "direction": top.direction,
+                            "threshold": thresh_val,
+                            "score_contribution": 25.0,
+                            "severity": "HIGH",
+                        },
+                    )
+                    discovery_proposals.append(disc_proposal)
+
+                    accepted, val_result, updated_book = self.validator.validate(current_book, disc_proposal)
+                    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+                    if accepted and updated_book is not None:
+                        rec = RuleAuditRecord(
+                            proposal_id=disc_proposal.proposal_id,
+                            round_number=round_number,
+                            rule_id=disc_proposal.rule_id,
+                            parameter_name=disc_proposal.parameter_name,
+                            old_value=disc_proposal.old_value,
+                            candidate_value=disc_proposal.candidate_value,
+                            rationale=(
+                                f"Discovered rule for observable feature '{top.feature_name}' (separation score: {top.separation_score:.4f}). "
+                                f"Chosen threshold {thresh_val} from reference {q_name} (Gate B false-positive rate: {val_result.validation_fp_rate:.1%})."
+                            ),
+                            status="ACCEPTED",
+                            gate_failed=None,
+                            rejection_reason="",
+                            validation_fp_rate=val_result.validation_fp_rate,
+                            rulebook_version_before=current_book.version,
+                            rulebook_version_after=updated_book.version,
+                            timestamp=timestamp,
+                        )
+                        audit_records.append(rec)
+                        current_book = updated_book
+                        any_accepted = True
+                        break  # Install first passing candidate and stop
+                    else:
+                        rec = RuleAuditRecord(
+                            proposal_id=disc_proposal.proposal_id,
+                            round_number=round_number,
+                            rule_id=disc_proposal.rule_id,
+                            parameter_name=disc_proposal.parameter_name,
+                            old_value=disc_proposal.old_value,
+                            candidate_value=disc_proposal.candidate_value,
+                            rationale=disc_proposal.rationale,
+                            status="REJECTED",
+                            gate_failed=val_result.gate_failed,
+                            rejection_reason=val_result.rejection_reason,
+                            validation_fp_rate=val_result.validation_fp_rate,
+                            rulebook_version_before=current_book.version,
+                            rulebook_version_after=current_book.version,
+                            timestamp=timestamp,
+                        )
+                        audit_records.append(rec)
+
+                proposals.extend(discovery_proposals)
+
+        if not audit_records:
+            return RuleWriterOutput(
+                active_rulebook=active_rulebook.clone(),
+                proposals=(),
+                audit_records=(),
+                accepted=False,
+                summary=f"Round {round_number}: No justified parameter adjustments identified from feedback.",
+                discovery_ranking=discovery_ranking_payload,
+            )
+
         summary = (
             f"Round {round_number}: {len(audit_records)} proposal(s) evaluated; "
             f"{'1 accepted, rulebook updated to v' + current_book.version if any_accepted else 'all rejected, rulebook maintained at v' + current_book.version}."
@@ -291,4 +417,5 @@ class RuleWriterAgent:
             audit_records=tuple(audit_records),
             accepted=any_accepted,
             summary=summary,
+            discovery_ranking=discovery_ranking_payload,
         )

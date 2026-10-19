@@ -34,7 +34,10 @@ class PlannerAgent:
     produce an ordered investigation strategy.
     """
 
-    def plan(self, claim: Claim) -> InvestigationPlan:
+    def __init__(self, rulebook: Optional[Any] = None) -> None:
+        self.rulebook = rulebook
+
+    def plan(self, claim: Claim, rulebook: Optional[Any] = None) -> InvestigationPlan:
         """
         Produce a typed InvestigationPlan for an observable claim.
 
@@ -42,6 +45,7 @@ class PlannerAgent:
         - For broad MVP coverage, all applicable checks are scheduled.
         - Checks are contextually reordered to front-load the most consequential
           potential anomalies based on observable claim indicators.
+        - Dynamically schedules any enabled rulebook rules using generic feature_threshold.
         """
         if not isinstance(claim, Claim):
             raise TypeError(f"Expected Claim instance, got {type(claim).__name__}")
@@ -143,6 +147,20 @@ class PlannerAgent:
         for task in ALL_RULE_TASKS:
             if task not in prioritized:
                 prioritized.append(task)
+
+        # Include any enabled rule whose template is feature_threshold (generic discovery route)
+        rb = rulebook or self.rulebook
+        if rb is not None and hasattr(rb, "rules"):
+            for rule in rb.rules:
+                if (
+                    rule.enabled
+                    and rule.template_id.lower() in ("tpl_feature_threshold", "feature_threshold")
+                    and rule.rule_id not in prioritized
+                ):
+                    prioritized.append(rule.rule_id)
+                    task_reasons[rule.rule_id] = (
+                        f"Dynamic threshold verification check ({rule.description})."
+                    )
 
         # Build strategy rationale
         if has_vehicle_anomaly:

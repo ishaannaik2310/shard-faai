@@ -173,7 +173,7 @@ class InvestigationPipeline:
     def process(self, claim: Claim, round_number: int = 1) -> PipelineResult:
         """Process a single observable claim through the three collaboration stages."""
         # Stage 1: Planning
-        plan = self.planner.plan(claim)
+        plan = self.planner.plan(claim, rulebook=self.rulebook)
 
         # Stage 2: Research
         evidence = self.researcher.gather_evidence(claim, plan)

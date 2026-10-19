@@ -208,6 +208,97 @@ def build_golden_regression_set() -> Tuple[Tuple[Claim, str, str], ...]:
     )
 
 
+def build_v3_golden_regression_set() -> Tuple[Tuple[Claim, str, str], ...]:
+    """
+    Construct a deterministic v3 golden regression suite of benchmark claims:
+    1. Clean genuine claim (submission elapsed 2 days -> APPROVE)
+    2. Genuine claim with longer submission elapsed (7 days -> APPROVE)
+    3. Boundary genuine claim (submission elapsed 5 days -> APPROVE)
+    """
+    clean_v3 = Claim(
+        claim_id="GOLDEN-V3-CLEAN-01",
+        policy_id="POL-G-V3-01",
+        claimant_id="CLMT-G-V3-01",
+        policy_inception_date="2025-01-01",
+        incident_date="2026-03-01",
+        filing_date="2026-03-03",
+        incident_type=IncidentType.COLLISION.value,
+        incident_description="Clean parking scrape.",
+        vehicle_registration="GF19 XKR",
+        vehicle_make="Ford",
+        vehicle_model="Focus",
+        vehicle_year=2019,
+        vehicle_registration_status=VehicleRegistrationStatus.VALID.value,
+        vehicle_write_off_status=VehicleWriteOffStatus.CLEAN.value,
+        prior_damage_reported=False,
+        claimed_amount=1000.0,
+        benchmark_repair_cost=1000.0,
+        repair_provider_id="PRV-NORM-101",
+        repair_line_items=(
+            RepairLineItem("Bumper respray", 600.0, "PAINT"),
+            RepairLineItem("Fitting labour", 400.0, "LABOUR"),
+        ),
+        linked_parties=(),
+    )
+
+    late_genuine_v3 = Claim(
+        claim_id="GOLDEN-V3-LATE-GENUINE-01",
+        policy_id="POL-G-V3-02",
+        claimant_id="CLMT-G-V3-02",
+        policy_inception_date="2025-01-01",
+        incident_date="2026-03-01",
+        filing_date="2026-03-08",
+        incident_type=IncidentType.COLLISION.value,
+        incident_description="Legitimate delay due to hospitalization.",
+        vehicle_registration="GF19 XKR",
+        vehicle_make="Ford",
+        vehicle_model="Focus",
+        vehicle_year=2019,
+        vehicle_registration_status=VehicleRegistrationStatus.VALID.value,
+        vehicle_write_off_status=VehicleWriteOffStatus.CLEAN.value,
+        prior_damage_reported=False,
+        claimed_amount=1200.0,
+        benchmark_repair_cost=1200.0,
+        repair_provider_id="PRV-NORM-102",
+        repair_line_items=(
+            RepairLineItem("Wing repair", 700.0, "BODY"),
+            RepairLineItem("Painting", 500.0, "PAINT"),
+        ),
+        linked_parties=(),
+    )
+
+    boundary_v3 = Claim(
+        claim_id="GOLDEN-V3-BOUNDARY-01",
+        policy_id="POL-G-V3-03",
+        claimant_id="CLMT-G-V3-03",
+        policy_inception_date="2025-01-01",
+        incident_date="2026-03-01",
+        filing_date="2026-03-06",
+        incident_type=IncidentType.COLLISION.value,
+        incident_description="Standard boundary filing case.",
+        vehicle_registration="GF19 XKR",
+        vehicle_make="Ford",
+        vehicle_model="Focus",
+        vehicle_year=2019,
+        vehicle_registration_status=VehicleRegistrationStatus.VALID.value,
+        vehicle_write_off_status=VehicleWriteOffStatus.CLEAN.value,
+        prior_damage_reported=False,
+        claimed_amount=800.0,
+        benchmark_repair_cost=800.0,
+        repair_provider_id="PRV-NORM-103",
+        repair_line_items=(
+            RepairLineItem("Mirror replacement", 800.0, "PARTS"),
+        ),
+        linked_parties=(),
+    )
+
+    return (
+        (clean_v3, "APPROVE", "NONE"),
+        (late_genuine_v3, "NOT_SUSPECTED_FRAUD", "NONE"),
+        (boundary_v3, "APPROVE", "NONE"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Validation Dataset Generator
 # ---------------------------------------------------------------------------
@@ -218,6 +309,7 @@ GATE_B_SEEDS: Set[int] = {GATE_B_V2_SEED, GATE_B_V3_SEED}
 
 _CACHED_VALIDATION_CLAIMS: Optional[Tuple[Claim, ...]] = None
 _CACHED_V3_VALIDATION_CLAIMS: Optional[Tuple[Claim, ...]] = None
+GLOBAL_DISCOVERED_RULES_CAP: int = 3
 
 
 def get_default_validation_dataset(n_claims: int = 40, seed: int = GATE_B_V2_SEED) -> Tuple[Claim, ...]:
@@ -233,6 +325,26 @@ def get_default_validation_dataset(n_claims: int = 40, seed: int = GATE_B_V2_SEE
         batch = ClaimGenerator(cfg).generate()
         _CACHED_VALIDATION_CLAIMS = batch.claims
     return _CACHED_VALIDATION_CLAIMS
+
+
+def get_v3_validation_dataset(n_claims: int = 200, seed: int = GATE_B_V3_SEED) -> Tuple[Claim, ...]:
+    """
+    Generate or return a cached, fixed v3 validation dataset of genuine claims
+    with include_v3_typologies=True (so it includes the ~5% genuine late filers).
+    """
+    global _CACHED_V3_VALIDATION_CLAIMS
+    if _CACHED_V3_VALIDATION_CLAIMS is None or len(_CACHED_V3_VALIDATION_CLAIMS) != n_claims:
+        cfg = GeneratorConfig(
+            seed=seed,
+            n_claims=n_claims,
+            fraud_share=0.0,
+            include_v3_typologies=True,
+            v3_typology_start_round=1,
+            round_number=1,
+        )
+        batch = ClaimGenerator(cfg).generate()
+        _CACHED_V3_VALIDATION_CLAIMS = batch.claims
+    return _CACHED_V3_VALIDATION_CLAIMS
 
 
 def increment_version(version_str: str) -> str:
@@ -263,11 +375,18 @@ class RuleValidator:
         self,
         fp_budget: float = 0.10,
         validation_claims: Optional[Sequence[Claim]] = None,
+        v3_mode: bool = False,
     ) -> None:
         if not (0.0 <= fp_budget <= 1.0):
             raise ValueError(f"fp_budget must be between 0.0 and 1.0, got {fp_budget}")
         self.fp_budget = fp_budget
-        self.validation_claims = tuple(validation_claims) if validation_claims is not None else get_default_validation_dataset()
+        self.v3_mode = v3_mode
+        if validation_claims is not None:
+            self.validation_claims = tuple(validation_claims)
+        elif v3_mode:
+            self.validation_claims = get_v3_validation_dataset()
+        else:
+            self.validation_claims = get_default_validation_dataset()
 
     def validate(
         self,
@@ -288,97 +407,235 @@ class RuleValidator:
         # -------------------------------------------------------------------
         # Gate A — Configuration Validity
         # -------------------------------------------------------------------
-        constraint_key = (proposal.rule_id, proposal.parameter_name)
-        if constraint_key not in SUPPORTED_CONSTRAINTS:
-            return (
-                False,
-                RuleValidationResult(
-                    passed=False,
-                    gate_failed="GATE_A_CONFIG",
-                    rejection_reason=(
-                        f"Unsupported parameter or rule ID: ('{proposal.rule_id}', '{proposal.parameter_name}'). "
-                        f"Only predefined numerical parameters may be adapted."
+        is_discovered = (
+            proposal.template_id in ("tpl_feature_threshold", "TPL_FEATURE_THRESHOLD")
+            or proposal.rule_id.startswith("RULE_DISCOVERED_")
+        )
+
+        if is_discovered:
+            existing_discovered = [
+                r for r in active_rulebook.rules if r.rule_id.startswith("RULE_DISCOVERED_")
+            ]
+            if len(existing_discovered) >= GLOBAL_DISCOVERED_RULES_CAP:
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=(
+                            f"Global cap on discovered rules ({GLOBAL_DISCOVERED_RULES_CAP}) reached."
+                        ),
+                        fp_budget=self.fp_budget,
                     ),
-                    fp_budget=self.fp_budget,
-                ),
-                None,
-            )
+                    None,
+                )
 
-        constraint = SUPPORTED_CONSTRAINTS[constraint_key]
-
-        # Verify active rule exists
-        try:
-            active_rule = active_rulebook.get_rule(proposal.rule_id)
-        except KeyError:
-            return (
-                False,
-                RuleValidationResult(
-                    passed=False,
-                    gate_failed="GATE_A_CONFIG",
-                    rejection_reason=f"Rule '{proposal.rule_id}' does not exist in Rulebook v{active_rulebook.version}.",
-                    fp_budget=self.fp_budget,
-                ),
-                None,
-            )
-
-        # Check parameter type
-        if not isinstance(proposal.candidate_value, (int, float)):
-            return (
-                False,
-                RuleValidationResult(
-                    passed=False,
-                    gate_failed="GATE_A_CONFIG",
-                    rejection_reason=(
-                        f"Candidate value must be numeric ({constraint.param_type.__name__}), "
-                        f"got {type(proposal.candidate_value).__name__}."
+            if any(
+                h.get("round_number") == proposal.round_number
+                and h.get("rule_id", "").startswith("RULE_DISCOVERED_")
+                and h.get("status") == "ACCEPTED"
+                for h in active_rulebook.history
+            ):
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=(
+                            f"Round {proposal.round_number} already installed a discovered rule. Max 1 per round."
+                        ),
+                        fp_budget=self.fp_budget,
                     ),
-                    fp_budget=self.fp_budget,
-                ),
-                None,
-            )
+                    None,
+                )
 
-        # Check bounds
-        cand_val = float(proposal.candidate_value)
-        if not (constraint.min_value <= cand_val <= constraint.max_value):
-            return (
-                False,
-                RuleValidationResult(
-                    passed=False,
-                    gate_failed="GATE_A_CONFIG",
-                    rejection_reason=(
-                        f"Candidate value {cand_val} is outside allowed bounds "
-                        f"[{constraint.min_value}, {constraint.max_value}] for '{proposal.parameter_name}'."
+            from shard.core.features import FEATURE_WHITELIST
+            params = proposal.rule_parameters or {}
+            feature = params.get("feature", "")
+            direction = params.get("direction", ">")
+            score_contrib = float(params.get("score_contribution", 20.0))
+            severity = str(params.get("severity", "MEDIUM"))
+
+            if not isinstance(proposal.candidate_value, (int, float)):
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=f"Candidate threshold must be numeric, got {type(proposal.candidate_value).__name__}.",
+                        fp_budget=self.fp_budget,
                     ),
-                    fp_budget=self.fp_budget,
-                ),
-                None,
-            )
+                    None,
+                )
 
-        # Check step size
-        current_val = float(active_rule.parameters.get(proposal.parameter_name, proposal.old_value))
-        step_taken = abs(cand_val - current_val)
-        if step_taken > (constraint.max_step_size + 1e-9):
-            return (
-                False,
-                RuleValidationResult(
-                    passed=False,
-                    gate_failed="GATE_A_CONFIG",
-                    rejection_reason=(
-                        f"Proposed step size {step_taken:.3f} exceeds maximum permitted step "
-                        f"{constraint.max_step_size:.3f} for '{proposal.parameter_name}'."
+            cand_threshold = float(proposal.candidate_value)
+
+            if feature not in FEATURE_WHITELIST:
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=f"Feature '{feature}' is not on the observable feature whitelist.",
+                        fp_budget=self.fp_budget,
                     ),
-                    fp_budget=self.fp_budget,
-                ),
-                None,
+                    None,
+                )
+
+            if direction not in (">", "<"):
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=f"Direction '{direction}' must be '>' or '<'.",
+                        fp_budget=self.fp_budget,
+                    ),
+                    None,
+                )
+
+            fdef = FEATURE_WHITELIST[feature]
+            if not (fdef.min_allowed_threshold <= cand_threshold <= fdef.max_allowed_threshold):
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=(
+                            f"Candidate threshold {cand_threshold} is outside allowed range "
+                            f"[{fdef.min_allowed_threshold}, {fdef.max_allowed_threshold}] for '{feature}'."
+                        ),
+                        fp_budget=self.fp_budget,
+                    ),
+                    None,
+                )
+
+            if not (10.0 <= score_contrib <= 30.0):
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=(
+                            f"Score contribution {score_contrib} outside allowable range [10.0, 30.0]."
+                        ),
+                        fp_budget=self.fp_budget,
+                    ),
+                    None,
+                )
+
+            from shard.rules.rulebook import RuleDefinition
+            candidate_rulebook = active_rulebook.clone()
+            candidate_rulebook.rules = [
+                r for r in candidate_rulebook.rules if r.rule_id != proposal.rule_id
+            ]
+            new_rule_def = RuleDefinition(
+                rule_id=proposal.rule_id,
+                template_id="tpl_feature_threshold",
+                description=f"Discovered rule for observable feature '{feature}' ({direction} {cand_threshold})",
+                enabled=True,
+                severity=severity,
+                score_contribution=score_contrib,
+                parameters={
+                    "feature": feature,
+                    "direction": direction,
+                    "threshold": cand_threshold,
+                },
             )
+            candidate_rulebook.rules.append(new_rule_def)
+            final_cand_val = cand_threshold
+        else:
+            constraint_key = (proposal.rule_id, proposal.parameter_name)
+            if constraint_key not in SUPPORTED_CONSTRAINTS:
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=(
+                            f"Unsupported parameter or rule ID: ('{proposal.rule_id}', '{proposal.parameter_name}'). "
+                            f"Only predefined numerical parameters may be adapted."
+                        ),
+                        fp_budget=self.fp_budget,
+                    ),
+                    None,
+                )
 
-        # Construct candidate rulebook safely without mutating active_rulebook
-        candidate_rulebook = active_rulebook.clone()
-        cand_rule = candidate_rulebook.get_rule(proposal.rule_id)
+            constraint = SUPPORTED_CONSTRAINTS[constraint_key]
 
-        # Format parameter value according to its constraint type (int vs float)
-        final_cand_val = int(cand_val) if constraint.param_type is int else round(cand_val, 4)
-        cand_rule.parameters[proposal.parameter_name] = final_cand_val
+            # Verify active rule exists
+            try:
+                active_rule = active_rulebook.get_rule(proposal.rule_id)
+            except KeyError:
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=f"Rule '{proposal.rule_id}' does not exist in Rulebook v{active_rulebook.version}.",
+                        fp_budget=self.fp_budget,
+                    ),
+                    None,
+                )
+
+            # Check parameter type
+            if not isinstance(proposal.candidate_value, (int, float)):
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=(
+                            f"Candidate value must be numeric ({constraint.param_type.__name__}), "
+                            f"got {type(proposal.candidate_value).__name__}."
+                        ),
+                        fp_budget=self.fp_budget,
+                    ),
+                    None,
+                )
+
+            # Check bounds
+            cand_val = float(proposal.candidate_value)
+            if not (constraint.min_value <= cand_val <= constraint.max_value):
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=(
+                            f"Candidate value {cand_val} is outside allowed bounds "
+                            f"[{constraint.min_value}, {constraint.max_value}] for '{proposal.parameter_name}'."
+                        ),
+                        fp_budget=self.fp_budget,
+                    ),
+                    None,
+                )
+
+            # Check step size
+            current_val = float(active_rule.parameters.get(proposal.parameter_name, proposal.old_value))
+            step_taken = abs(cand_val - current_val)
+            if step_taken > (constraint.max_step_size + 1e-9):
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_A_CONFIG",
+                        rejection_reason=(
+                            f"Proposed step size {step_taken:.3f} exceeds maximum permitted step "
+                            f"{constraint.max_step_size:.3f} for '{proposal.parameter_name}'."
+                        ),
+                        fp_budget=self.fp_budget,
+                    ),
+                    None,
+                )
+
+            # Construct candidate rulebook safely without mutating active_rulebook
+            candidate_rulebook = active_rulebook.clone()
+            cand_rule = candidate_rulebook.get_rule(proposal.rule_id)
+
+            # Format parameter value according to its constraint type (int vs float)
+            final_cand_val = int(cand_val) if constraint.param_type is int else round(cand_val, 4)
+            cand_rule.parameters[proposal.parameter_name] = final_cand_val
 
         # -------------------------------------------------------------------
         # Gate B — False-Positive Budget
@@ -409,10 +666,9 @@ class RuleValidator:
                 None,
             )
 
-        # -------------------------------------------------------------------
-        # Gate C — Golden-Set Regression
-        # -------------------------------------------------------------------
-        golden_suite = build_golden_regression_set()
+        golden_suite = list(build_golden_regression_set())
+        if self.v3_mode:
+            golden_suite.extend(build_v3_golden_regression_set())
         for g_claim, expected_outcome, required_rule in golden_suite:
             decision = candidate_rulebook.evaluate_claim(g_claim)
 
@@ -426,6 +682,24 @@ class RuleValidator:
                         rejection_reason=(
                             f"Golden clean claim '{g_claim.claim_id}' was flagged with disposition "
                             f"{decision.disposition.value} (risk score {decision.risk_score})."
+                        ),
+                        validation_fp_rate=fp_rate,
+                        fp_budget=self.fp_budget,
+                        golden_set_passed=False,
+                    ),
+                    None,
+                )
+
+            # Check genuine late claim is not auto-rejected as SUSPECTED_FRAUD
+            if expected_outcome == "NOT_SUSPECTED_FRAUD" and decision.disposition == Disposition.SUSPECTED_FRAUD:
+                return (
+                    False,
+                    RuleValidationResult(
+                        passed=False,
+                        gate_failed="GATE_C_REGRESSION",
+                        rejection_reason=(
+                            f"Golden genuine claim '{g_claim.claim_id}' was flagged as SUSPECTED_FRAUD "
+                            f"(risk score {decision.risk_score})."
                         ),
                         validation_fp_rate=fp_rate,
                         fp_budget=self.fp_budget,
@@ -482,6 +756,7 @@ class RuleValidator:
         candidate_rulebook.version = new_version
         candidate_rulebook.history.append({
             "version": new_version,
+            "round_number": proposal.round_number,
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "proposal_id": proposal.proposal_id,
             "rule_id": proposal.rule_id,

@@ -249,6 +249,18 @@ class AuditLogger:
             round_number=round_number,
         )
 
+    def log_discovery_ranking(
+        self,
+        ranking_payload: Dict[str, Any],
+        round_number: int,
+    ) -> AuditEvent:
+        """Log feature separation ranking produced by generic discovery."""
+        return self.log_event(
+            event_type="DISCOVERY_RANKING",
+            payload=ranking_payload,
+            round_number=round_number,
+        )
+
     def log_round_end(
         self,
         round_number: int,
