@@ -38,143 +38,477 @@ from shard.orchestrator import ExperimentResult, RoundResult
 # ---------------------------------------------------------------------------
 
 THEME_COLORS = {
-    "bg_dark": "#0e1117",
-    "surface": "#161b22",
-    "surface_subtle": "#21262d",
-    "border": "#30363d",
-    "text_primary": "#c9d1d9",
-    "text_muted": "#8b949e",
-    "accent_blue": "#58a6ff",
-    "approve": "#3fb950",
-    "approve_bg": "#122a1b",
-    "refer": "#d29922",
-    "refer_bg": "#332612",
-    "fraud": "#f85149",
-    "fraud_bg": "#3c1618",
+    "bg_dark": "#f7f8fa",
+    "surface": "#ffffff",
+    "surface_subtle": "#f3f4f6",
+    "border": "#e5e7eb",
+    "border_subtle": "#d1d5db",
+    "text_primary": "#111827",
+    "text_secondary": "#4b5563",
+    "text_muted": "#6b7280",
+    "accent_blue": "#2563eb",
+    "approve": "#16a34a",
+    "approve_bg": "#ecfdf5",
+    "approve_border": "#a7f3d0",
+    "refer": "#d97706",
+    "refer_bg": "#fffbeb",
+    "refer_border": "#fde68a",
+    "fraud": "#dc2626",
+    "fraud_bg": "#fef2f2",
+    "fraud_border": "#fecaca",
 }
 
 DISPOSITION_BADGE_STYLE = {
     "APPROVE": {
         "color": THEME_COLORS["approve"],
         "bg": THEME_COLORS["approve_bg"],
-        "border": THEME_COLORS["approve"],
+        "border": THEME_COLORS["approve_border"],
         "label": "APPROVE",
     },
     "REFER": {
         "color": THEME_COLORS["refer"],
         "bg": THEME_COLORS["refer_bg"],
-        "border": THEME_COLORS["refer"],
+        "border": THEME_COLORS["refer_border"],
         "label": "REFER (MANUAL REVIEW)",
     },
     "SUSPECTED_FRAUD": {
         "color": THEME_COLORS["fraud"],
         "bg": THEME_COLORS["fraud_bg"],
-        "border": THEME_COLORS["fraud"],
+        "border": THEME_COLORS["fraud_border"],
         "label": "SUSPECTED FRAUD",
     },
 }
 
 CUSTOM_CSS = f"""
 <style>
-/* Main App Styling */
-.main {{
-    background-color: {THEME_COLORS['bg_dark']};
-    color: {THEME_COLORS['text_primary']};
+/* 1. Global Viewport & Canvas Background (Diagonal hatching as in screenshot) */
+html, body, [data-testid="stAppViewContainer"], .stApp {{
+    background-color: #f7f8fa !important;
+    background-image: repeating-linear-gradient(
+        -45deg,
+        #f0f2f5,
+        #f0f2f5 1px,
+        #f7f8fa 1px,
+        #f7f8fa 12px
+    ) !important;
+    color: #111827 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
 }}
 
-/* KPI Metric Card */
-.kpi-card {{
-    background-color: {THEME_COLORS['surface']};
-    border: 1px solid {THEME_COLORS['border']};
-    border-radius: 6px;
-    padding: 16px 20px;
-    margin-bottom: 12px;
+[data-testid="stHeader"] {{
+    background: transparent !important;
 }}
-.kpi-title {{
-    color: {THEME_COLORS['text_muted']};
-    font-size: 0.82rem;
+
+/* 2. Main Content Container */
+.main .block-container {{
+    max-width: 1240px !important;
+    padding-top: 1.25rem !important;
+    padding-bottom: 3rem !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+}}
+
+/* 3. Top Architectural Brand Header */
+.top-nav-bar {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 9999px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}}
+.brand-mark {{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: #111827;
+    letter-spacing: -0.02em;
+}}
+.pillar-icon {{
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+}}
+.pillar-bar {{
+    width: 6px;
+    height: 18px;
+    background: #111827;
+    border-radius: 9999px;
+}}
+.nav-links-row {{
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #4b5563;
+}}
+.nav-links-row span {{
+    cursor: default;
+    transition: color 0.15s ease;
+}}
+.nav-links-row span:hover {{
+    color: #111827;
+}}
+
+/* 4. Framed Box with Technical Corner Brackets (from reference) */
+.framed-box {{
+    position: relative;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 38px 44px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}}
+.bracket-tl {{
+    position: absolute;
+    top: -5px; left: -5px;
+    width: 13px; height: 13px;
+    border-top: 2px solid #111827;
+    border-left: 2px solid #111827;
+}}
+.bracket-tr {{
+    position: absolute;
+    top: -5px; right: -5px;
+    width: 13px; height: 13px;
+    border-top: 2px solid #111827;
+    border-right: 2px solid #111827;
+}}
+.bracket-bl {{
+    position: absolute;
+    bottom: -5px; left: -5px;
+    width: 13px; height: 13px;
+    border-bottom: 2px solid #111827;
+    border-left: 2px solid #111827;
+}}
+.bracket-br {{
+    position: absolute;
+    bottom: -5px; right: -5px;
+    width: 13px; height: 13px;
+    border-bottom: 2px solid #111827;
+    border-right: 2px solid #111827;
+}}
+
+/* 5. Typography Hierarchy */
+.kicker {{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.76rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    margin-bottom: 14px;
+}}
+.kicker-dot {{
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #2563eb;
+    display: inline-block;
+}}
+.display-headline {{
+    font-size: 2.5rem;
+    font-weight: 500;
+    color: #111827;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin-bottom: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}}
+.body-lead {{
+    font-size: 0.98rem;
+    line-height: 1.6;
+    color: #4b5563;
+    margin-bottom: 24px;
+}}
+
+/* 6. Capsule Buttons */
+.btn-capsule-dark {{
+    display: inline-block;
+    background-color: #111827;
+    color: #ffffff !important;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 10px 24px;
+    border-radius: 9999px;
+    text-decoration: none;
+    margin-right: 12px;
+}}
+.btn-capsule-light {{
+    display: inline-block;
+    background-color: #f3f4f6;
+    color: #111827 !important;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 10px 24px;
+    border-radius: 9999px;
+    text-decoration: none;
+}}
+
+/* Streamlit Button Overrides */
+div.stButton > button[kind="primary"], div.stButton > button {{
+    border-radius: 9999px !important;
+    font-weight: 600 !important;
+    font-size: 0.88rem !important;
+    padding: 8px 24px !important;
+    transition: all 0.15s ease !important;
+}}
+div.stButton > button[kind="primary"] {{
+    background-color: #111827 !important;
+    color: #ffffff !important;
+    border: 1px solid #111827 !important;
+}}
+div.stButton > button[kind="primary"]:hover {{
+    background-color: #27272a !important;
+    border-color: #27272a !important;
+    box-shadow: 0 4px 12px rgba(17, 24, 39, 0.15) !important;
+}}
+div.stButton > button:not([kind="primary"]) {{
+    background-color: #f3f4f6 !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+}}
+div.stButton > button:not([kind="primary"]):hover {{
+    background-color: #e5e7eb !important;
+    color: #000000 !important;
+}}
+
+/* Streamlit Download Button Overrides */
+div.stDownloadButton > button {{
+    border-radius: 9999px !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    padding: 8px 22px !important;
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}}
+div.stDownloadButton > button:hover {{
+    background-color: #f9fafb !important;
+    border-color: #9ca3af !important;
+}}
+
+/* 7. Capsule Tabs Bar (Reference style) */
+.stTabs [data-baseweb="tab-list"] {{
+    gap: 8px !important;
+    background-color: #ffffff !important;
+    padding: 6px 10px !important;
+    border-radius: 9999px !important;
+    border: 1px solid #e5e7eb !important;
+    margin-bottom: 24px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}}
+.stTabs [data-baseweb="tab"] {{
+    border-radius: 9999px !important;
+    padding: 8px 18px !important;
+    color: #4b5563 !important;
+    font-size: 0.86rem !important;
+    font-weight: 500 !important;
+    border: none !important;
+    background-color: transparent !important;
+    height: auto !important;
+}}
+.stTabs [aria-selected="true"] {{
+    background-color: #111827 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}}
+
+/* 8. KPI Metric Cards */
+.kpi-card {{
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}}
+.kpi-card:hover {{
+    border-color: #d1d5db;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}}
+.kpi-title {{
+    color: #6b7280;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     margin-bottom: 6px;
 }}
 .kpi-value {{
-    color: #ffffff;
-    font-size: 1.75rem;
+    color: #111827;
+    font-size: 1.85rem;
     font-weight: 700;
-    line-height: 1.2;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
 }}
 .kpi-subtext {{
-    color: {THEME_COLORS['text_muted']};
-    font-size: 0.78rem;
+    color: #9ca3af;
+    font-size: 0.76rem;
     margin-top: 4px;
 }}
 
-/* Status Banner */
+/* 9. Status Banners */
 .status-banner {{
-    border-radius: 6px;
-    padding: 12px 18px;
-    margin-bottom: 16px;
-    border: 1px solid;
-    font-size: 0.95rem;
+    border-radius: 9999px;
+    padding: 10px 22px;
+    margin-bottom: 20px;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }}
 .status-target-met {{
-    background-color: {THEME_COLORS['approve_bg']};
-    border-color: {THEME_COLORS['approve']};
-    color: #e6ffed;
+    background-color: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
 }}
 .status-max-rounds {{
-    background-color: {THEME_COLORS['refer_bg']};
-    border-color: {THEME_COLORS['refer']};
-    color: #fff8c5;
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
 }}
 .status-failed {{
-    background-color: {THEME_COLORS['fraud_bg']};
-    border-color: {THEME_COLORS['fraud']};
-    color: #ffebe9;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
 }}
 
-/* Disposition Pills */
-.badge-approve {{
-    background-color: {THEME_COLORS['approve_bg']};
-    color: {THEME_COLORS['approve']};
-    border: 1px solid {THEME_COLORS['approve']};
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
+/* 10. Disposition Badges (Capsule pills) */
+.badge-capsule {{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: 0.76rem;
     font-weight: 600;
+    letter-spacing: 0.02em;
+}}
+.badge-dot {{
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
     display: inline-block;
+}}
+.badge-approve {{
+    background-color: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+}}
+.dot-approve {{
+    background-color: #10b981;
 }}
 .badge-refer {{
-    background-color: {THEME_COLORS['refer_bg']};
-    color: {THEME_COLORS['refer']};
-    border: 1px solid {THEME_COLORS['refer']};
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    display: inline-block;
+    background-color: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}}
+.dot-refer {{
+    background-color: #f59e0b;
 }}
 .badge-fraud {{
-    background-color: {THEME_COLORS['fraud_bg']};
-    color: {THEME_COLORS['fraud']};
-    border: 1px solid {THEME_COLORS['fraud']};
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    display: inline-block;
+    background-color: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}}
+.dot-fraud {{
+    background-color: #ef4444;
 }}
 
-/* Section Header */
+/* 11. Section Header */
 .section-header {{
     font-size: 1.15rem;
     font-weight: 600;
+    color: #111827;
+    letter-spacing: -0.01em;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 8px;
+    margin-top: 24px;
+    margin-bottom: 16px;
+}}
+
+/* 12. Right Visual Card with Atmospheric Lighting (Reference Hero) */
+.hero-media-card {{
+    position: relative;
+    width: 100%;
+    min-height: 290px;
+    border-radius: 24px;
+    background: radial-gradient(circle at 75% 65%, rgba(249, 115, 22, 0.8) 0%, rgba(59, 130, 246, 0.7) 40%, rgba(15, 23, 42, 0.95) 75%),
+                linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    overflow: hidden;
+    box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.18);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 24px 28px;
     color: #ffffff;
-    border-bottom: 1px solid {THEME_COLORS['border']};
-    padding-bottom: 6px;
-    margin-top: 18px;
-    margin-bottom: 14px;
+}}
+.hero-media-overlay {{
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(15,23,42,0.85) 100%);
+}}
+.hero-media-badge {{
+    position: relative;
+    z-index: 2;
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 9999px;
+    padding: 4px 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #ffffff;
+    margin-bottom: auto;
+}}
+.hero-media-title {{
+    position: relative;
+    z-index: 2;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+}}
+.hero-media-desc {{
+    position: relative;
+    z-index: 2;
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.4;
+}}
+
+/* 13. Sidebar Styling */
+[data-testid="stSidebar"] {{
+    background-color: #ffffff !important;
+    border-right: 1px solid #e5e7eb !important;
+}}
+[data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
+    color: #111827 !important;
+}}
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {{
+    color: #374151 !important;
+}}
+
+/* 14. Dataframe and Table Styling */
+[data-testid="stDataFrame"] {{
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
 }}
 </style>
 """
@@ -202,12 +536,12 @@ def render_disposition_badge(disposition: str) -> str:
     """Produce HTML badge for a triage disposition recommendation."""
     disp_upper = disposition.upper()
     if disp_upper == "APPROVE":
-        return f'<span class="badge-approve">APPROVE</span>'
+        return f'<span class="badge-capsule badge-approve"><span class="badge-dot dot-approve"></span>APPROVE</span>'
     elif disp_upper == "REFER":
-        return f'<span class="badge-refer">REFER</span>'
+        return f'<span class="badge-capsule badge-refer"><span class="badge-dot dot-refer"></span>REFER</span>'
     elif disp_upper == "SUSPECTED_FRAUD":
-        return f'<span class="badge-fraud">SUSPECTED FRAUD</span>'
-    return f'<span class="badge-refer">{disposition}</span>'
+        return f'<span class="badge-capsule badge-fraud"><span class="badge-dot dot-fraud"></span>SUSPECTED FRAUD</span>'
+    return f'<span class="badge-capsule badge-refer">{disposition}</span>'
 
 
 # ---------------------------------------------------------------------------
@@ -408,30 +742,30 @@ def create_metrics_progression_chart(experiment: ExperimentResult) -> go.Figure:
     ))
 
     fig.update_layout(
-        title=dict(text="Measured Adversarial Feedback Trajectory", font=dict(color="#ffffff", size=15)),
+        title=dict(text="Measured Adversarial Feedback Trajectory", font=dict(color="#111827", size=15)),
         xaxis=dict(
             title="Experiment Round",
             tickmode="linear",
             tick0=1,
             dtick=1,
-            gridcolor=THEME_COLORS["border"],
-            color=THEME_COLORS["text_muted"],
+            gridcolor="#f3f4f6",
+            color="#4b5563",
         ),
         yaxis=dict(
             title="Metric (%)",
             range=[0, 105],
-            gridcolor=THEME_COLORS["border"],
-            color=THEME_COLORS["text_muted"],
+            gridcolor="#f3f4f6",
+            color="#4b5563",
         ),
-        paper_bgcolor=THEME_COLORS["surface"],
-        plot_bgcolor=THEME_COLORS["surface"],
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
             x=1,
-            font=dict(color=THEME_COLORS["text_primary"]),
+            font=dict(color="#111827"),
         ),
         margin=dict(l=40, r=30, t=50, b=40),
         height=340,
@@ -461,7 +795,7 @@ def create_confusion_matrix_heatmap(report: CriticReport) -> go.Figure:
                 x=x[j],
                 y=y[i],
                 text=labels[i][j],
-                font=dict(color="#ffffff", size=14, family="sans-serif"),
+                font=dict(color="#111827", size=14, family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto"),
                 showarrow=False,
             ))
 
@@ -469,17 +803,17 @@ def create_confusion_matrix_heatmap(report: CriticReport) -> go.Figure:
         z=z,
         x=x,
         y=y,
-        colorscale=[[0, THEME_COLORS["surface_subtle"]], [1, THEME_COLORS["accent_blue"]]],
+        colorscale=[[0, "#f8fafc"], [1, "#dbeafe"]],
         showscale=False,
     ))
 
     fig.update_layout(
-        title=dict(text="Confusion Matrix (Investigation Triage vs Ground Truth)", font=dict(color="#ffffff", size=14)),
+        title=dict(text="Confusion Matrix (Investigation Triage vs Ground Truth)", font=dict(color="#111827", size=14)),
         annotations=annotations,
-        paper_bgcolor=THEME_COLORS["surface"],
-        plot_bgcolor=THEME_COLORS["surface"],
-        xaxis=dict(color=THEME_COLORS["text_primary"]),
-        yaxis=dict(color=THEME_COLORS["text_primary"]),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        xaxis=dict(color="#111827"),
+        yaxis=dict(color="#111827"),
         margin=dict(l=50, r=40, t=50, b=40),
         height=280,
     )

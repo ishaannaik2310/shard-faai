@@ -283,19 +283,71 @@ if st.session_state.last_error:
 
 res: Optional[ExperimentResult] = st.session_state.experiment_result
 
+# Top Architectural Brand Bar
+st.markdown(
+    """
+    <div class="top-nav-bar">
+        <div class="brand-mark">
+            <span class="pillar-icon">
+                <span class="pillar-bar"></span>
+                <span class="pillar-bar"></span>
+            </span>
+            <span>SHARD Control Room</span>
+        </div>
+        <div class="nav-links-row">
+            <span>Simulation Engine</span>
+            <span>Deterministic Triage</span>
+            <span>Safety Gates</span>
+            <span>v3 Discovery</span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
 if res is None:
+    # 50/50 Split Architectural Framed Hero with Corner Crop Marks
     st.markdown(
-        """
-        ## 🛡️ Welcome to SHARD Control Room
-        **Adversarial Multi-Agent Insurance Claims Auditor**
-
-        Insurer fraud controls degrade over time because organized fraudsters learn which thresholds trigger
-        investigation and deliberately evolve their attack patterns. Traditional rules-based systems suffer from
-        **structural detection lag** — new rules are written only after fraud has slipped through, and proposed updates
-        are rarely stress-tested against genuine claims before live deployment.
-
-        **SHARD** resolves this challenge through an autonomous, closed-loop agentic feedback system:
-        """
+        f"""
+        <div class="framed-box">
+            <div class="bracket-tl"></div>
+            <div class="bracket-tr"></div>
+            <div class="bracket-bl"></div>
+            <div class="bracket-br"></div>
+            <div style="display:flex; gap:36px; align-items:center; flex-wrap:wrap;">
+                <div style="flex:1.15; min-width:320px;">
+                    <div class="kicker">
+                        <span class="kicker-dot"></span>
+                        #1 ADVERSARIAL AUDITOR / MOTOR CLAIMS CONTROL ROOM
+                    </div>
+                    <div class="display-headline">
+                        Welcome to SHARD Control Room
+                    </div>
+                    <p class="body-lead">
+                        Whether investigating exaggerated garage invoices, ghost registrations, or unmodelled delayed filings—SHARD's 
+                        autonomous multi-agent closed loop connects planning, deterministic verification, critic evaluation, 
+                        and bounded safety gates in one unified decision-support platform.
+                    </p>
+                    <div>
+                        <span class="btn-capsule-dark">Configure & Run in Sidebar</span>
+                        <span class="btn-capsule-light">Pure Deterministic Logic</span>
+                    </div>
+                </div>
+                <div style="flex:0.85; min-width:300px;">
+                    <div class="hero-media-card">
+                        <div class="hero-media-overlay"></div>
+                        <div class="hero-media-badge">ADVERSARIAL CLOSED LOOP</div>
+                        <div class="hero-media-title">Continuous Adaptive Defense</div>
+                        <div class="hero-media-desc">
+                            Simulates evasive fraudster typologies, triggers deterministic tool investigations, 
+                            and autonomously discovers unmodelled attack patterns through safety gates.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     col1, col2, col3 = st.columns(3)
@@ -304,8 +356,8 @@ if res is None:
             f"""
             <div class="kpi-card">
                 <div class="kpi-title">Adversarial Adaptation</div>
-                <div style="font-size:1.1rem; font-weight:600; color:{THEME_COLORS['accent_blue']};">Fraudster Agent</div>
-                <p style="font-size:0.85rem; color:{THEME_COLORS['text_muted']}; margin-top:8px;">
+                <div style="font-size:1.15rem; font-weight:700; color:{THEME_COLORS['accent_blue']};">Fraudster Agent</div>
+                <p style="font-size:0.85rem; color:{THEME_COLORS['text_muted']}; margin-top:8px; line-height:1.5;">
                     Simulates evolving attacks across 5 synthetic fraud typologies, dynamically shifting sampling weights toward patterns that evaded prior investigation.
                 </p>
             </div>
@@ -317,8 +369,8 @@ if res is None:
             f"""
             <div class="kpi-card">
                 <div class="kpi-title">Deterministic Investigation</div>
-                <div style="font-size:1.1rem; font-weight:600; color:{THEME_COLORS['approve']};">Pipeline Trio</div>
-                <p style="font-size:0.85rem; color:{THEME_COLORS['text_muted']}; margin-top:8px;">
+                <div style="font-size:1.15rem; font-weight:700; color:{THEME_COLORS['approve']};">Pipeline Trio</div>
+                <p style="font-size:0.85rem; color:{THEME_COLORS['text_muted']}; margin-top:8px; line-height:1.5;">
                     <b>Planner</b> selects checks; <b>Researcher</b> retrieves synthetic policy/vehicle dossiers; <b>Investigator</b> runs 6 deterministic verification tools.
                 </p>
             </div>
@@ -330,8 +382,8 @@ if res is None:
             f"""
             <div class="kpi-card">
                 <div class="kpi-title">Safe Control Evolution</div>
-                <div style="font-size:1.1rem; font-weight:600; color:{THEME_COLORS['refer']};">Critic & Rule-Writer</div>
-                <p style="font-size:0.85rem; color:{THEME_COLORS['text_muted']}; margin-top:8px;">
+                <div style="font-size:1.15rem; font-weight:700; color:{THEME_COLORS['refer']};">Critic & Rule-Writer</div>
+                <p style="font-size:0.85rem; color:{THEME_COLORS['text_muted']}; margin-top:8px; line-height:1.5;">
                     <b>Critic</b> evaluates against GroundTruthVault; <b>Rule-Writer</b> proposes bounded rule updates; <b>Validation Gate</b> enforces strict FP budget safeguards.
                 </p>
             </div>
@@ -339,22 +391,29 @@ if res is None:
             unsafe_allow_html=True,
         )
 
-    st.markdown("### 📋 The 5 Synthetic Fraud Typologies in Scope")
+    st.markdown('<div class="section-header">Synthetic Fraud Typologies in Scope</div>', unsafe_allow_html=True)
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         st.markdown(
-            """
-            1. **Exaggerated Repair Cost**: Inflated garage labour and parts exceeding independent estimatics benchmarks.
-            2. **Opportunistic Line-Item Inflation**: Legitimate repairs padded with fictitious unrelated items or arithmetic mismatches.
-            3. **Staged Collision**: Collusion networks with rapid inception velocity (claim filed immediately after policy purchase).
-            """
+            f"""
+            <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; padding:18px 22px; font-size:0.88rem; color:#374151; line-height:1.7; margin-bottom:12px;">
+                1. <b>Exaggerated Repair Cost</b>: Inflated garage labour and parts exceeding independent estimatics benchmarks.<br>
+                2. <b>Opportunistic Line-Item Inflation</b>: Legitimate repairs padded with fictitious unrelated items or arithmetic mismatches.<br>
+                3. <b>Staged Collision</b>: Collusion networks with rapid inception velocity (claim filed immediately after policy purchase).
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
     with col_t2:
         st.markdown(
-            """
-            4. **Ghost Vehicle**: Claims submitted on fictitious registrations or vehicles with invalid registration status.
-            5. **Pre-Existing Damage**: Known or historical write-off markers (CAT A/B) falsely claimed as fresh collision impact.
-            """
+            f"""
+            <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; padding:18px 22px; font-size:0.88rem; color:#374151; line-height:1.7; margin-bottom:12px;">
+                4. <b>Ghost Vehicle</b>: Claims submitted on fictitious registrations or vehicles with invalid registration status.<br>
+                5. <b>Pre-Existing Damage</b>: Known or historical write-off markers (CAT A/B) falsely claimed as fresh collision impact.<br>
+                6. <b>Delayed Filing (v3 Unmodelled)</b>: Evasive filing timing designed to evade standard velocity thresholds.
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
     st.info("👈 Configure your experiment parameters in the sidebar and click **Run Loop** to launch the live multi-agent simulation.")
@@ -536,6 +595,12 @@ else:
             col_c1, col_c2 = st.columns([1, 1])
 
             with col_c1:
+                st.markdown(
+                    """
+                    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:20px 24px; margin-bottom:16px;">
+                    """,
+                    unsafe_allow_html=True,
+                )
                 st.markdown("#### 📄 Submission Details")
                 if selected_claim:
                     st.write(f"**Claim ID:** `{selected_claim.claim_id}`")
@@ -548,8 +613,15 @@ else:
                     st.write(f"**Incident Description:** {selected_claim.incident_description}")
                 else:
                     st.info("Claim submission details unavailable.")
+                st.markdown("</div>", unsafe_allow_html=True)
 
             with col_c2:
+                st.markdown(
+                    """
+                    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:20px 24px; margin-bottom:16px;">
+                    """,
+                    unsafe_allow_html=True,
+                )
                 st.markdown("#### ⚖️ Triage Disposition & Score")
                 badge_html = render_disposition_badge(selected_dec.disposition.value)
                 st.markdown(f"**Recommendation:** {badge_html}", unsafe_allow_html=True)
@@ -567,9 +639,10 @@ else:
                         """,
                         unsafe_allow_html=True,
                     )
+                st.markdown("</div>", unsafe_allow_html=True)
 
             # Structured Tool Trace & Evidence Bundle
-            st.markdown("#### 🔬 Agent Pipeline Trace")
+            st.markdown('<div class="section-header">🔬 Agent Pipeline Trace</div>', unsafe_allow_html=True)
             trace_tabs = st.tabs(["Planner Task Rationale", "Research Evidence Dossier", "Deterministic Tool Trace"])
 
             with trace_tabs[0]:
@@ -653,6 +726,12 @@ else:
         col_m1, col_m2 = st.columns([1, 1])
 
         with col_m1:
+            st.markdown(
+                """
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:22px 26px; height:100%; margin-bottom:16px;">
+                """,
+                unsafe_allow_html=True,
+            )
             st.markdown("#### 🎯 Evaluation Metrics")
             st.write(f"**Total Claims Evaluated:** {crit_rep.total_evaluated}")
             st.write(f"**True Positives (Fraud Caught):** {crit_rep.tp}")
@@ -664,10 +743,18 @@ else:
             st.write(f"**F1 Score:** {format_pct(crit_rep.f1)}")
             st.write(f"**False Positive Rate:** {format_pct(crit_rep.fpr)}")
             st.write(f"**Accuracy:** {format_pct(crit_rep.accuracy)}")
+            st.markdown("</div>", unsafe_allow_html=True)
 
         with col_m2:
+            st.markdown(
+                """
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 16px; height:100%; margin-bottom:16px;">
+                """,
+                unsafe_allow_html=True,
+            )
             matrix_fig = create_confusion_matrix_heatmap(crit_rep)
             st.plotly_chart(matrix_fig, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("#### 🏷️ Breakdown by Synthetic Fraud Typology")
         typology_df = build_typology_metrics_dataframe(crit_rep)
