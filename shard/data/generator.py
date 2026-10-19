@@ -37,6 +37,15 @@ DEFAULT_TYPOLOGY_WEIGHTS: Dict[str, float] = {
     FraudTypology.OPPORTUNISTIC_INFLATION.value: 0.15,
 }
 
+DEFAULT_V3_TYPOLOGY_WEIGHTS: Dict[str, float] = {
+    FraudTypology.EXAGGERATED_REPAIR.value: 0.20,
+    FraudTypology.STAGED_COLLISION.value: 0.20,
+    FraudTypology.GHOST_VEHICLE.value: 0.15,
+    FraudTypology.PRE_EXISTING_DAMAGE.value: 0.15,
+    FraudTypology.OPPORTUNISTIC_INFLATION.value: 0.15,
+    FraudTypology.DELAYED_FILING.value: 0.15,
+}
+
 VEHICLE_CATALOGUE: Sequence[Tuple[str, str]] = (
     ("Ford", "Focus"),
     ("Vauxhall", "Corsa"),
@@ -76,12 +85,19 @@ class GeneratorConfig:
     n_claims: int = 30
     fraud_share: float = 0.3
     typology_weights: Dict[str, float] = field(default_factory=lambda: dict(DEFAULT_TYPOLOGY_WEIGHTS))
+    include_v3_typologies: bool = False
+    v3_typology_start_round: int = 2
+    round_number: int = 1
 
     def __post_init__(self) -> None:
         if self.n_claims < 0:
             raise ValueError(f"n_claims must be non-negative, got {self.n_claims}")
         if not (0.0 <= self.fraud_share <= 1.0):
             raise ValueError(f"fraud_share must be between 0.0 and 1.0, got {self.fraud_share}")
+        if self.v3_typology_start_round < 1:
+            raise ValueError(f"v3_typology_start_round must be >= 1, got {self.v3_typology_start_round}")
+        if self.round_number < 1:
+            raise ValueError(f"round_number must be >= 1, got {self.round_number}")
         if not self.typology_weights:
             raise ValueError("typology_weights dictionary cannot be empty")
         for typology, weight in self.typology_weights.items():
@@ -89,6 +105,19 @@ class GeneratorConfig:
                 raise ValueError(f"Weight for typology '{typology}' must be non-negative, got {weight}")
         if sum(self.typology_weights.values()) <= 0.0:
             raise ValueError("Sum of typology_weights must be strictly positive")
+        if (
+            self.include_v3_typologies
+            and self.round_number >= self.v3_typology_start_round
+            and self.typology_weights == DEFAULT_TYPOLOGY_WEIGHTS
+        ):
+            object.__setattr__(self, "typology_weights", dict(DEFAULT_V3_TYPOLOGY_WEIGHTS))
+        if (
+            not self.include_v3_typologies
+            and FraudTypology.DELAYED_FILING.value in self.typology_weights
+        ):
+            raise ValueError(
+                "DELAYED_FILING cannot be included in typology_weights when include_v3_typologies is False"
+            )
 
 
 @dataclass(frozen=True)
@@ -141,7 +170,12 @@ class ClaimGenerator:
                 claim_ids.append(cid)
 
         # Normalise typology weights
-        typology_items = list(cfg.typology_weights.items())
+        active_weights = dict(cfg.typology_weights)
+        if not cfg.include_v3_typologies or cfg.round_number < cfg.v3_typology_start_round:
+            if FraudTypology.DELAYED_FILING.value in active_weights:
+                active_weights.pop(FraudTypology.DELAYED_FILING.value)
+
+        typology_items = list(active_weights.items())
         typologies = [item[0] for item in typology_items]
         weights = [item[1] for item in typology_items]
 
@@ -156,7 +190,9 @@ class ClaimGenerator:
         # 1. Genuine claims
         for i in range(n_genuine):
             cid = claim_ids[i]
-            claim, gt = self._build_genuine_claim(cid, rng)
+            claim, gt = self._build_genuine_claim(
+                cid, rng, include_v3_typologies=cfg.include_v3_typologies
+            )
             pairs.append((claim, gt))
 
         # 2. Fraudulent claims
@@ -268,18 +304,29 @@ class ClaimGenerator:
         return tuple(items)
 
     def _build_genuine_claim(
-        self, claim_id: str, rng: random.Random
+        self,
+        claim_id: str,
+        rng: random.Random,
+        include_v3_typologies: bool = False,
     ) -> Tuple[Claim, GroundTruthRecord]:
         """Build an authentic motor insurance claim with standard parameters."""
         make, model = rng.choice(VEHICLE_CATALOGUE)
         vehicle_year = rng.randint(2016, 2023)
         plate = self._generate_plate(rng)
 
+        if include_v3_typologies:
+            if rng.random() < 0.05:
+                filing_delay = rng.randint(6, 8)
+            else:
+                filing_delay = rng.randint(1, 5)
+        else:
+            filing_delay = rng.randint(1, 5)
+
         incept, incident, filing = self._generate_dates(
             rng,
             min_policy_age_days=90,
             max_policy_age_days=400,
-            filing_delay_days=rng.randint(1, 5),
+            filing_delay_days=filing_delay,
         )
 
         benchmark = round(rng.uniform(850.0, 3200.0), 2)
@@ -523,6 +570,46 @@ class ClaimGenerator:
                 is_fraud=True,
                 fraud_typology=typology,
                 detail="Opportunistic claim padding: unrelated alloy wheel refurbishment added to quote.",
+            )
+
+        elif typology == FraudTypology.DELAYED_FILING.value:
+            incept, incident, filing = self._generate_dates(
+                rng,
+                min_policy_age_days=90,
+                max_policy_age_days=400,
+                filing_delay_days=rng.randint(4, 10),
+            )
+            benchmark = round(rng.uniform(850.0, 3200.0), 2)
+            claimed = round(benchmark * rng.uniform(0.92, 1.12), 2)
+            line_items = self._build_line_items(claimed, rng)
+
+            claim = Claim(
+                claim_id=claim_id,
+                policy_id=f"POL-{rng.randint(100000, 999999)}",
+                claimant_id=f"CLMT-{rng.randint(10000, 99999)}",
+                policy_inception_date=incept,
+                incident_date=incident,
+                filing_date=filing,
+                incident_type=IncidentType.COLLISION.value,
+                incident_description="Standard low-speed rear-end collision at traffic signal.",
+                vehicle_registration=plate,
+                vehicle_make=make,
+                vehicle_model=model,
+                vehicle_year=vehicle_year,
+                vehicle_registration_status=VehicleRegistrationStatus.VALID.value,
+                vehicle_write_off_status=VehicleWriteOffStatus.CLEAN.value,
+                prior_damage_reported=False,
+                claimed_amount=claimed,
+                benchmark_repair_cost=benchmark,
+                repair_provider_id=rng.choice(STANDARD_PROVIDERS),
+                repair_line_items=line_items,
+                linked_parties=(),
+            )
+            gt = GroundTruthRecord(
+                claim_id=claim_id,
+                is_fraud=True,
+                fraud_typology=typology,
+                detail="Delayed filing fraud: claim submission delayed past normal notification window.",
             )
 
         else:

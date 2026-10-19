@@ -55,6 +55,8 @@ class FraudsterAgent:
         adaptation_strength: float = 0.15,
         max_weight: float = 0.60,
         min_weight: float = 0.05,
+        include_v3_typologies: bool = False,
+        v3_typology_start_round: int = 2,
     ) -> None:
         if adaptation_strength < 0.0:
             raise ValueError(f"adaptation_strength must be non-negative, got {adaptation_strength}")
@@ -67,6 +69,8 @@ class FraudsterAgent:
         self.adaptation_strength = adaptation_strength
         self.max_weight = max_weight
         self.min_weight = min_weight
+        self.include_v3_typologies = include_v3_typologies
+        self.v3_typology_start_round = v3_typology_start_round
 
         # Normalize and store baseline weights
         weights_source = initial_weights or dict(DEFAULT_TYPOLOGY_WEIGHTS)
@@ -163,6 +167,12 @@ class FraudsterAgent:
         """
         prior_weights = dict(self.current_weights)
 
+        # In v3 mode: introduce DELAYED_FILING from start_round onward
+        if self.include_v3_typologies and round_number >= self.v3_typology_start_round:
+            if FraudTypology.DELAYED_FILING.value not in self.current_weights:
+                self.current_weights[FraudTypology.DELAYED_FILING.value] = 0.15
+                self.current_weights = self._normalize_weights(self.current_weights)
+
         # Adapt weights if feedback is provided for subsequent rounds
         if round_number > 1 and feedback is not None:
             updated_weights, feedback_info, adapted = self.adapt_weights(feedback)
@@ -178,6 +188,9 @@ class FraudsterAgent:
             n_claims=n_claims,
             fraud_share=fraud_share,
             typology_weights=dict(self.current_weights),
+            include_v3_typologies=self.include_v3_typologies,
+            v3_typology_start_round=self.v3_typology_start_round,
+            round_number=round_number,
         )
 
         batch = ClaimGenerator(config).generate()
